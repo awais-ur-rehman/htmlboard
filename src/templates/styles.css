@@ -1,0 +1,133 @@
+/*
+ * Shared styles for every design in this folder: tokens, base and components.
+ * Designs link it (<link rel="stylesheet" href="../styles.css">) and keep only
+ * what is specific to them in their own <style>.
+ */
+
+/* Tokens */
+:root {
+  --bg: #0b0d13;
+  --surface: #141724;
+  --surface-2: #1c2030;
+  --border: #23283c;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-light: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --rose: #f43f5e;
+  --purple: #a855f7;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+}
+a { color: inherit; text-decoration: none; }
+
+/* Text */
+.muted { color: var(--text-muted); }
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font: 600 13px var(--font);
+  color: var(--text);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { border-color: var(--border); }
+.btn-secondary:hover { background: #262c44; }
+.btn-outline { background: transparent; border-color: #3b4260; }
+.btn-outline:hover { background: rgba(255, 255, 255, 0.05); }
+.btn-danger { background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.3); color: var(--rose); }
+.btn-danger:hover { background: rgba(244, 63, 94, 0.25); }
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent-light);
+}
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge-emerald { background: rgba(16, 185, 129, 0.15); color: var(--emerald); }
+.badge-amber { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+.badge-rose { background: rgba(244, 63, 94, 0.15); color: var(--rose); }
+
+/* Inputs */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font: 13px var(--font);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.input:focus { border-color: var(--accent); }
+
+/* Avatar */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  font-size: 14px;
+  font-weight: 700;
+}

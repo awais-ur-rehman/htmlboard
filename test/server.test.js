@@ -1,6 +1,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { startServer, discoverDesigns, loadDesignsManifest } from '../src/index.js';
 
@@ -90,6 +91,17 @@ describe('HtmlBoard Core Functionality', () => {
     const html = await res.text();
     assert.ok(html.includes('Mobile Feed Screen'));
     assert.ok(html.includes('$42,850.75'));
+  });
+
+  test('the sample designs share styles.css', async () => {
+    const res = await fetch(`${serverInstance.url}/styles.css`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type'), /text\/css/);
+    assert.ok((await res.text()).includes('--accent'));
+    for (const file of ['01-screens/01-desktop.html', '01-screens/02-mobile.html', '02-components/01-ui-kit.html']) {
+      const html = fs.readFileSync(path.join(TEMPLATES_DIR, file), 'utf8');
+      assert.ok(html.includes('<link rel="stylesheet" href="../styles.css">'), file);
+    }
   });
 
   test('GET /__explorer/explorer.css serves the explorer CSS styles', async () => {
