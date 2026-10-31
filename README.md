@@ -59,7 +59,7 @@ htmlboard
 
 ### Scaffold a Starter Project
 
-To start with sample designs (a folder of screens and a folder of components, each file describing itself):
+To start with sample designs (a folder of screens and a folder of components, each file describing itself, all sharing one `styles.css`):
 
 ```bash
 npx htmlboard --init
@@ -180,6 +180,8 @@ Every `.html` file under the folder is a design (hidden folders, `node_modules`,
 
 **Categories** drive the filters. Left out, they come from words in the path, then from the size when it is a screen's (a phone's width, a tablet's 3:4, a desktop's landscape); flyers, boards and other formats get none and show under **All**.
 
+**Shared styles.** Designs link one stylesheet for what they share (tokens, base styles, components) and keep only their own CSS in their `<style>`, so they stay consistent and each new design is shorter to write. The samples use a `styles.css` at the top of the folder (`<link rel="stylesheet" href="../styles.css">`), and the agent skill tells LLMs to read it, use it and grow it. Editing it reloads every design that links it.
+
 ---
 
 ## 📋 `designs.json` (Optional)
@@ -298,6 +300,7 @@ htmlboard/
 │   │   ├── favicon.svg, logo.svg, mark.svg
 │   │   └── fonts/        # Inter and Bricolage Grotesque (OFL)
 │   └── templates/        # The sample designs `--init` adds
+│       ├── styles.css    # Their shared tokens and components
 │       ├── 01-screens/   # Desktop dashboard, mobile feed
 │       └── 02-components/
 ├── skills/

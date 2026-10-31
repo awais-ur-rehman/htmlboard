@@ -23,7 +23,7 @@ npx htmlboard designs --open
 
 ## Write an artboard
 
-One design per file, self-contained so it renders on its own, with its facts in the `<head>`:
+One design per file, with its facts in the `<head>`, linking the shared stylesheet (see below):
 
 ```html
 <!DOCTYPE html>
@@ -33,9 +33,9 @@ One design per file, self-contained so it renders on its own, with its facts in 
   <title>Checkout · one page</title>                         <!-- its name on the canvas -->
   <meta name="description" content="Address and payment on one screen">
   <meta name="htmlboard" content="width=390, height=844">   <!-- its size -->
+  <link rel="stylesheet" href="../styles.css">              <!-- shared tokens and components -->
   <style>
-    body { margin: 0; }
-    .screen { width: 390px; height: 844px; /* … */ }
+    .screen { height: 844px; /* only what this design needs */ }
   </style>
 </head>
 <body>
@@ -47,8 +47,19 @@ One design per file, self-contained so it renders on its own, with its facts in 
 - Always give the `width`: it is the frame's viewport, and the page's CSS needs it. Give the `height` for fixed sizes (a phone screen, a flyer: the frame cuts at it); leave it out for pages that should grow with their content.
 - Design at the real size of the target: phone 390×844, tablet 768×1024, desktop 1280×800 (or 1440×900), and the exact size for print or social formats (e.g. 1080×1350).
 - Use real content in the user's language, not lorem ipsum.
-- Relative links to shared CSS, images, scripts and fonts work (`assets/logo.svg`; `../css/theme.css` with `--root`). Reuse the project's own stylesheet and tokens when there is one.
+- Relative links to CSS, images, scripts and fonts work (`assets/logo.svg`; `../css/theme.css` with `--root`).
 - No build step: plain HTML, CSS and browser JavaScript (ES modules and CDN scripts work).
+
+## Shared styles
+
+Put what the designs share in one stylesheet instead of repeating it in every file: it keeps the designs consistent and spares writing the same CSS again.
+
+- The designs folder has a `styles.css` at its top (sample projects start with one). Read it before writing a design and use its tokens (`var(--accent)`) and classes (`.btn`, `.card`, …).
+- If there is none and the project already has a stylesheet or design tokens, link those. Otherwise create `styles.css` with your first design: colors, type and spacing as custom properties, the base styles, and the components you'll repeat.
+- Link it with a relative path: `styles.css` from the top of the folder, `../styles.css` from a section folder.
+- A design's own `<style>` holds only what is specific to it. When a second design needs the same thing, move it to `styles.css`.
+- Split it when it grows (`components/forms.css`, `charts.css`) and link the extra files where they are used.
+- Editing `styles.css` restyles every design that links it, which is the point for a product's screens. For one-off explorations that should keep their look (a different style, logo options), style them in their own file instead.
 
 More tags, all optional:
 
