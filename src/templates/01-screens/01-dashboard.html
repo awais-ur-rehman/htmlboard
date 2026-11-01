@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <meta name="description" content="Analytics dashboard with sidebar, metric cards, and charts">
+  <meta name="htmlboard" content="width=1280, height=820">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="module" src="../components.js"></script>
+  <style>
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+    .grid-2 .card { padding: 22px; }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      font-size: 12px;
+    }
+    .panel-title { font-size: 16px; font-weight: 600; }
+    .chart-container { width: 100%; height: 180px; }
+  </style>
+</head>
+<body class="app">
+  <app-sidebar active="Dashboard"></app-sidebar>
+
+  <main class="app-main">
+    <app-topbar search="Search resources, clients, reports...">
+      <span class="muted">Last sync: Just now</span>
+      <button class="btn btn-primary">+ New Deployment</button>
+    </app-topbar>
+
+    <div class="app-content">
+      <div>
+        <h1 class="page-title">Executive Overview</h1>
+        <p class="page-sub">Performance metrics and active client deployments</p>
+      </div>
+
+      <div class="stats-row">
+        <stat-card label="Monthly Recurring Revenue" value="$184,290" trend="▲ +12.4% vs last mo"></stat-card>
+        <stat-card label="Active Organizations" value="1,428" trend="▲ +48 new"></stat-card>
+        <stat-card label="API Requests (24h)" value="42.8M" trend="▲ 99.98% uptime"></stat-card>
+        <stat-card label="Average Latency" value="34ms" trend="▼ -2ms target" warn></stat-card>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="panel-header">
+            <h2 class="panel-title">Throughput & Workload Trends</h2>
+            <span class="muted">Trailing 7 Days</span>
+          </div>
+          <div class="chart-container">
+            <svg viewBox="0 0 500 150" width="100%" height="100%" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#6366f1" stop-opacity="0.5"/>
+                  <stop offset="100%" stop-color="#6366f1" stop-opacity="0.0"/>
+                </linearGradient>
+              </defs>
+              <path d="M 0 130 Q 80 70, 150 90 T 300 40 T 420 50 T 500 20 L 500 150 L 0 150 Z" fill="url(#chartGrad)"/>
+              <path d="M 0 130 Q 80 70, 150 90 T 300 40 T 420 50 T 500 20" fill="none" stroke="#6366f1" stroke-width="3"/>
+              <circle cx="500" cy="20" r="4" fill="#a855f7" stroke="#fff" stroke-width="2"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="panel-header">
+            <h2 class="panel-title">Recent Audits</h2>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>us-east-cluster-01</td>
+                <td><span class="badge badge-emerald">Optimal</span></td>
+              </tr>
+              <tr>
+                <td>auth-gateway-proxy</td>
+                <td><span class="badge badge-emerald">Optimal</span></td>
+              </tr>
+              <tr>
+                <td>edge-cache-frankfurt</td>
+                <td><span class="badge badge-amber">Rebalancing</span></td>
+              </tr>
+              <tr>
+                <td>db-replica-primary</td>
+                <td><span class="badge badge-emerald">Optimal</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

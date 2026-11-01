@@ -1,0 +1,67 @@
+<!-- <app-sidebar active="Dashboard"></app-sidebar> -->
+<div class="brand row"><span class="logo">⚡</span> Nexus Platform</div>
+
+<nav>
+  <div class="label">Core</div>
+  <a href="../01-screens/01-dashboard.html">📊 Dashboard</a>
+  <a href="../01-screens/02-customers.html">👥 Customers</a>
+  <a href="#">💳 Invoices</a>
+  <a href="#">📈 Analytics</a>
+  <div class="label">System</div>
+  <a href="#">⚙️ Settings</a>
+  <a href="#">🛡️ Security</a>
+</nav>
+
+<div class="user row">
+  <div class="avatar">AM</div>
+  <div>
+    <div class="name">Alex Morgan</div>
+    <div class="email muted">alex@nexus.io</div>
+  </div>
+</div>
+
+<style>
+  & {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 240px;
+    padding: 20px 16px;
+    background: #10131d;
+    border-right: 1px solid var(--border);
+  }
+  .brand { gap: 10px; padding: 4px 8px 24px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+  .logo {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--accent), #3b82f6);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    font-size: 16px;
+  }
+  nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  nav .label { padding: 8px 12px 4px; font-size: 11px; }
+  nav .label ~ .label { margin-top: 16px; }
+  nav a {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+  }
+  nav a:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); }
+  nav a.active { background: rgba(99, 102, 241, 0.12); color: var(--accent-light); font-weight: 600; }
+  .user { padding: 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); }
+  .user .avatar { background: linear-gradient(135deg, #ec4899, #8b5cf6); font-weight: 600; }
+  .name { font-size: 13px; font-weight: 600; }
+  .email { font-size: 11px; }
+</style>
+
+<script>
+  // The link named by active="…" is the current page
+  const active = this.getAttribute('active');
+  for (const link of this.querySelectorAll('nav a')) link.classList.toggle('active', link.textContent.includes(active));
+</script>

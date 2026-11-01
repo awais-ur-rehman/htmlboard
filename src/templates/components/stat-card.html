@@ -1,0 +1,14 @@
+<!-- <stat-card label="Monthly Recurring Revenue" value="$184,290" trend="▲ +12.4% vs last mo"></stat-card> <stat-card label="Average Latency" value="34ms" trend="▼ -2ms target" warn></stat-card> -->
+<div class="card">
+  <div class="name muted">{{label}}</div>
+  <div class="value">{{value}}</div>
+  <div class="trend">{{trend}}</div>
+</div>
+
+<style>
+  .card { height: 100%; }
+  .name { font-size: 13px; margin-bottom: 8px; }
+  .value { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+  .trend { font-size: 12px; font-weight: 600; color: var(--emerald); }
+  &[warn] .trend { color: var(--amber); }
+</style>

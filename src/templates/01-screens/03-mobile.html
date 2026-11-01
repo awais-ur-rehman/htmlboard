@@ -7,6 +7,7 @@
   <meta name="description" content="Smartphone screen with balance card, quick actions, and transaction feed">
   <meta name="htmlboard" content="width=390, height=844">
   <link rel="stylesheet" href="../styles.css">
+  <script type="module" src="../components.js"></script>
   <style>
     body {
       min-height: 100vh;
@@ -132,28 +133,6 @@
       gap: 10px;
       padding: 8px 20px;
     }
-    .tx-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
-      border-radius: 16px;
-    }
-    .tx-item .row { gap: 14px; }
-    .tx-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: var(--surface-2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-    .tx-name, .tx-amount { font-size: 14px; font-weight: 600; }
-    .tx-amount { font-weight: 700; }
-    .tx-amount.positive { color: var(--emerald); }
-    .tx-date { font-size: 12px; margin-top: 2px; }
     /* Bottom Navigation */
     .bottom-nav {
       position: fixed;
@@ -232,38 +211,9 @@
   </div>
 
   <div class="tx-list">
-    <div class="tx-item card">
-      <div class="row">
-        <div class="tx-icon">🛍️</div>
-        <div>
-          <div class="tx-name">Apple Store</div>
-          <div class="tx-date muted">Today, 2:15 PM • Electronics</div>
-        </div>
-      </div>
-      <div class="tx-amount">-$199.00</div>
-    </div>
-
-    <div class="tx-item card">
-      <div class="row">
-        <div class="tx-icon">💼</div>
-        <div>
-          <div class="tx-name">Client Invoice #1042</div>
-          <div class="tx-date muted">Yesterday • Wire Transfer</div>
-        </div>
-      </div>
-      <div class="tx-amount positive">+$3,450.00</div>
-    </div>
-
-    <div class="tx-item card">
-      <div class="row">
-        <div class="tx-icon">☕</div>
-        <div>
-          <div class="tx-name">Blue Bottle Coffee</div>
-          <div class="tx-date muted">Oct 26 • Food & Beverage</div>
-        </div>
-      </div>
-      <div class="tx-amount">-$6.75</div>
-    </div>
+    <tx-item icon="🛍️" name="Apple Store" meta="Today, 2:15 PM • Electronics" amount="-$199.00"></tx-item>
+    <tx-item icon="💼" name="Client Invoice #1042" meta="Yesterday • Wire Transfer" amount="+$3,450.00" positive></tx-item>
+    <tx-item icon="☕" name="Blue Bottle Coffee" meta="Oct 26 • Food & Beverage" amount="-$6.75"></tx-item>
   </div>
 
   <div class="bottom-nav">

@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Component Library Preview</title>
-  <meta name="description" content="Buttons, inputs, badges, cards, and interactive elements">
-  <meta name="htmlboard" content="width=780, height=720, category=components">
+  <meta name="description" content="Buttons, inputs, badges and avatars from styles.css, and the components built with them">
+  <meta name="htmlboard" content="width=780, category=components">
   <link rel="stylesheet" href="../styles.css">
+  <script type="module" src="../components.js"></script>
   <style>
     body {
       padding: 24px;
@@ -20,15 +21,16 @@
     }
     .title { font-size: 20px; font-weight: 700; }
     .subtitle { font-size: 13px; margin-top: 4px; }
-    .card { display: flex; flex-direction: column; gap: 16px; }
+    body > .card { display: flex; flex-direction: column; gap: 16px; }
     .row { flex-wrap: wrap; }
     .field { flex: 1; min-width: 200px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   </style>
 </head>
 <body>
   <div class="header">
     <h1 class="title">Design System Components</h1>
-    <p class="subtitle muted">Everything here comes from styles.css, shared by all the designs</p>
+    <p class="subtitle muted">The classes in styles.css and the components in components/, shared by all the designs</p>
   </div>
 
   <div class="card">
@@ -71,6 +73,16 @@
       <div class="avatar">LC</div>
       <div class="avatar" style="background: linear-gradient(135deg, #ec4899, #8b5cf6)">AM</div>
       <div class="avatar" style="width: 44px; height: 44px; font-size: 16px">JS</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">Components: &lt;stat-card&gt; and &lt;tx-item&gt;</div>
+    <div class="pair">
+      <stat-card label="Monthly Recurring Revenue" value="$184,290" trend="▲ +12.4% vs last mo"></stat-card>
+      <stat-card label="Average Latency" value="34ms" trend="▼ -2ms target" warn></stat-card>
+      <tx-item icon="💼" name="Client Invoice #1042" meta="Yesterday • Wire Transfer" amount="+$3,450.00" positive></tx-item>
+      <tx-item icon="☕" name="Blue Bottle Coffee" meta="Oct 26 • Food & Beverage" amount="-$6.75"></tx-item>
     </div>
   </div>
 </body>

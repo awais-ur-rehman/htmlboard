@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customers</title>
+  <meta name="description" content="Customer list with plans and status, in the same sidebar and top bar as the dashboard">
+  <meta name="htmlboard" content="width=1280, height=820">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="module" src="../components.js"></script>
+  <style>
+    .header { display: flex; justify-content: space-between; align-items: flex-end; }
+    .filters { display: flex; gap: 8px; }
+    .table .row { gap: 10px; }
+    .table .avatar { width: 30px; height: 30px; font-size: 11px; }
+    .org { font-weight: 600; }
+    .table td:last-child, .table th:last-child { text-align: right; padding-right: 0; }
+  </style>
+</head>
+<body class="app">
+  <app-sidebar active="Customers"></app-sidebar>
+
+  <main class="app-main">
+    <app-topbar search="Search customers...">
+      <button class="btn btn-secondary">Export CSV</button>
+      <button class="btn btn-primary">+ Add Customer</button>
+    </app-topbar>
+
+    <div class="app-content">
+      <div class="header">
+        <div>
+          <h1 class="page-title">Customers</h1>
+          <p class="page-sub">1,428 organizations on 3 plans</p>
+        </div>
+        <div class="filters">
+          <span class="badge">All plans</span>
+          <span class="badge badge-emerald">Active</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="table">
+          <thead>
+            <tr><th>Organization</th><th>Plan</th><th>Seats</th><th>MRR</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="row"><div class="avatar">AC</div><div><div class="org">Acme Cloud</div><div class="muted">acme.cloud</div></div></div></td>
+              <td>Enterprise</td><td>240</td><td>$12,400</td><td><span class="badge badge-emerald">Active</span></td>
+            </tr>
+            <tr>
+              <td><div class="row"><div class="avatar">LX</div><div><div class="org">Lumen Labs</div><div class="muted">lumenlabs.io</div></div></div></td>
+              <td>Growth</td><td>58</td><td>$2,320</td><td><span class="badge badge-emerald">Active</span></td>
+            </tr>
+            <tr>
+              <td><div class="row"><div class="avatar">NB</div><div><div class="org">Northbeam</div><div class="muted">northbeam.co</div></div></div></td>
+              <td>Growth</td><td>34</td><td>$1,360</td><td><span class="badge badge-amber">Trial ends in 3 days</span></td>
+            </tr>
+            <tr>
+              <td><div class="row"><div class="avatar">QS</div><div><div class="org">Quarry Studio</div><div class="muted">quarry.studio</div></div></div></td>
+              <td>Starter</td><td>6</td><td>$90</td><td><span class="badge badge-emerald">Active</span></td>
+            </tr>
+            <tr>
+              <td><div class="row"><div class="avatar">FW</div><div><div class="org">Fieldwise</div><div class="muted">fieldwise.app</div></div></div></td>
+              <td>Enterprise</td><td>410</td><td>$19,850</td><td><span class="badge badge-rose">Payment failed</span></td>
+            </tr>
+            <tr>
+              <td><div class="row"><div class="avatar">OT</div><div><div class="org">Orbit Travel</div><div class="muted">orbit.travel</div></div></div></td>
+              <td>Growth</td><td>72</td><td>$2,880</td><td><span class="badge badge-emerald">Active</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

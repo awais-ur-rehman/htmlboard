@@ -1,0 +1,33 @@
+<!-- <tx-item icon="💼" name="Client Invoice #1042" meta="Yesterday • Wire Transfer" amount="+$3,450.00" positive></tx-item> <tx-item icon="☕" name="Blue Bottle Coffee" meta="Oct 26 • Food & Beverage" amount="-$6.75"></tx-item> -->
+<div class="icon">{{icon}}</div>
+<div class="what">
+  <div class="name">{{name}}</div>
+  <div class="meta muted">{{meta}}</div>
+</div>
+<div class="amount">{{amount}}</div>
+
+<style>
+  & {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+  .icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    font-size: 18px;
+  }
+  .what { flex: 1; }
+  .name { font-size: 14px; font-weight: 600; }
+  .meta { font-size: 12px; margin-top: 2px; }
+  .amount { font-size: 14px; font-weight: 700; }
+  &[positive] .amount { color: var(--emerald); }
+</style>

@@ -1,0 +1,19 @@
+<!-- <app-topbar search="Search customers..."><button class="btn btn-primary">+ Add Customer</button></app-topbar> -->
+<input class="input" type="text" placeholder="{{search}}">
+<div class="row"><slot></slot></div>
+
+<style>
+  & {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    height: 64px;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(11, 13, 19, 0.8);
+    backdrop-filter: blur(12px);
+  }
+  .input { width: 280px; padding: 8px 16px; }
+  .row { gap: 16px; font-size: 13px; }
+</style>

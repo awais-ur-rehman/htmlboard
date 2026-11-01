@@ -35,20 +35,23 @@ describe('HtmlBoard Core Functionality', () => {
 
     const allArtboards = manifest.sections.flatMap((s) => s.artboards);
     assert.ok(allArtboards.some((b) => b.file.includes('mobile.html')));
-    assert.ok(allArtboards.some((b) => b.file.includes('desktop.html')));
+    assert.ok(allArtboards.some((b) => b.file.includes('dashboard.html')));
   });
 
   test('the sample designs describe themselves: folders, sizes, descriptions', () => {
     const manifest = loadDesignsManifest(TEMPLATES_DIR);
     assert.equal(manifest.autoDiscovered, true);
-    assert.deepEqual(manifest.sections.map((s) => s.name), ['screens', 'components']);
-    const [desktop, mobile] = manifest.sections[0].artboards;
-    assert.equal(desktop.title, 'Desktop Dashboard');
-    assert.equal(desktop.id, 'screens-desktop');
-    assert.deepEqual([desktop.width, desktop.height, desktop.category], [1280, 820, 'desktop']);
+    // components/ holds components, not designs
+    assert.deepEqual(manifest.sections.map((s) => s.name), ['screens', 'ui kit']);
+    const [dashboard, customers, mobile] = manifest.sections[0].artboards;
+    assert.equal(dashboard.title, 'Dashboard');
+    assert.equal(dashboard.id, 'screens-dashboard');
+    assert.deepEqual([dashboard.width, dashboard.height, dashboard.category], [1280, 820, 'desktop']);
+    assert.deepEqual([customers.width, customers.height, customers.category], [1280, 820, 'desktop']);
     assert.deepEqual([mobile.width, mobile.height, mobile.category], [390, 844, 'mobile']);
     assert.match(mobile.description, /balance card/);
-    assert.equal(manifest.sections[1].artboards[0].category, 'components');
+    const [kit] = manifest.sections[1].artboards;
+    assert.deepEqual([kit.width, kit.height, kit.category], [780, undefined, 'components']);
   });
 
   test('GET / serves the explorer index.html', async () => {
@@ -85,23 +88,36 @@ describe('HtmlBoard Core Functionality', () => {
     }
   });
 
-  test('GET /01-screens/02-mobile.html serves the sample mobile artboard', async () => {
-    const res = await fetch(`${serverInstance.url}/01-screens/02-mobile.html`);
+  test('GET /01-screens/03-mobile.html serves the sample mobile artboard', async () => {
+    const res = await fetch(`${serverInstance.url}/01-screens/03-mobile.html`);
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.ok(html.includes('Mobile Feed Screen'));
     assert.ok(html.includes('$42,850.75'));
   });
 
-  test('the sample designs share styles.css', async () => {
+  test('the sample designs share styles.css and components', async () => {
     const res = await fetch(`${serverInstance.url}/styles.css`);
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type'), /text\/css/);
     assert.ok((await res.text()).includes('--accent'));
-    for (const file of ['01-screens/01-desktop.html', '01-screens/02-mobile.html', '02-components/01-ui-kit.html']) {
-      const html = fs.readFileSync(path.join(TEMPLATES_DIR, file), 'utf8');
+    const designs = ['01-screens/01-dashboard.html', '01-screens/02-customers.html', '01-screens/03-mobile.html', '02-ui-kit/01-overview.html']
+      .map((file) => [file, fs.readFileSync(path.join(TEMPLATES_DIR, file), 'utf8')]);
+    for (const [file, html] of designs) {
       assert.ok(html.includes('<link rel="stylesheet" href="../styles.css">'), file);
+      assert.ok(html.includes('<script type="module" src="../components.js"></script>'), file);
     }
+    // Every sample component starts with an example and is used by two designs
+    const components = fs.readdirSync(path.join(TEMPLATES_DIR, 'components'));
+    assert.deepEqual(components.sort(), ['app-sidebar.html', 'app-topbar.html', 'stat-card.html', 'tx-item.html']);
+    for (const file of components) {
+      const tag = file.replace('.html', '');
+      assert.match(fs.readFileSync(path.join(TEMPLATES_DIR, 'components', file), 'utf8'), new RegExp(`^<!-- <${tag}[ >]`), file);
+      assert.equal(designs.filter(([, html]) => html.includes(`<${tag} `)).length, 2, tag);
+    }
+    const loader = await fetch(`${serverInstance.url}/components.js`);
+    assert.match(loader.headers.get('content-type'), /javascript/);
+    assert.match(await loader.text(), /customElements\.define/);
   });
 
   test('GET /__explorer/explorer.css serves the explorer CSS styles', async () => {
