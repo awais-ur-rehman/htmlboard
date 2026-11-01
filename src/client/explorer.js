@@ -19,6 +19,7 @@ const DRAG_SLOP = 4;       // screen px a press can move and still be a click
 const DOUBLE_MS = 350;
 const CHANGE_MS = 60;      // saved files arriving this close together are applied at once
 const DEFAULT_SIZE = [1200, 800]; // a design whose entry gives no size; without a height it grows with its page
+const FIT_HEIGHT = 100;    // a frame that fits its page however short (a component's) starts this tall
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -141,7 +142,8 @@ function makeDesign(board, section) {
     path: `/${file.split('?')[0]}`,
     title: board.title || file,
     w: Number(board.width) || DEFAULT_SIZE[0],
-    h: Number(board.height) || DEFAULT_SIZE[1],
+    // A page is never shorter than its frame, so a frame grows to its page but can't shrink to it
+    h: Number(board.height) || (board.fit ? FIT_HEIGHT : DEFAULT_SIZE[1]),
     autoHeight: !Number(board.height),
     x: 0,
     y: 0,
@@ -185,6 +187,15 @@ function onLoad(design) {
   if (!doc || !design.autoHeight) return;
   growToPage(design);
   doc.fonts?.ready.then(() => growToPage(design));
+  // Pages go on building themselves after they load (components, scripts): measured again when
+  // they change. Not when the frame grows: a page always a bit taller than its frame would grow forever.
+  let timer = 0;
+  new design.iframe.contentWindow.MutationObserver(() => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (design.autoHeight && design.iframe.contentDocument === doc) growToPage(design);
+    }, 50);
+  }).observe(doc.documentElement, { childList: true, subtree: true });
 }
 
 // A design without a height takes its page's.
