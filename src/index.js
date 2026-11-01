@@ -15,8 +15,16 @@ export {
   normalizeManifest,
   inferCategory,
   parseDesignMeta,
+  scanComponents,
   scanDesigns
 } from './designs.js';
+
+export {
+  installComponents,
+  componentPreview,
+  COMPONENTS_FOLDER,
+  COMPONENTS_SCRIPT
+} from './components.js';
 
 export {
   installSkills,

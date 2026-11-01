@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { COMPONENTS_FOLDER, PREVIEW_WIDTH, isPage, isTagName } from './components.js';
 
 // Which designs a folder holds, and how the canvas shows them.
 //
@@ -16,6 +17,9 @@ import path from 'node:path';
 // A designs.json beside them is optional and only curates: sections with their titles, the order,
 // overrides for a design's values. Designs it doesn't list come after the ones it does (unless it
 // says "unlisted": "hide").
+//
+// The components in components/ (pieces of pages, see components.js) aren't designs. A designs.json
+// can show them anyway, each in a frame of its own: "components": "show", or listing them.
 
 /** Folders discovery leaves alone (hidden ones too) */
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'build']);
@@ -127,7 +131,7 @@ function parseVariant(content) {
 export function parseDesignMeta(html) {
   const end = html.search(/<\/head\s*>|<body[\s>]/i);
   const head = end >= 0 ? html.slice(0, end) : html.slice(0, 65536);
-  const meta = { variants: [] };
+  const meta = { variants: [], page: isPage(html) };
   const title = head.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   if (title) {
     const text = decode(title[1]).replace(/\s+/g, ' ').trim();
@@ -203,7 +207,8 @@ function variantDesign(base, { query, label }) {
 
 /**
  * Every design in the folder, in order: the files of a folder by name (number prefixes order
- * them), each followed by its variants, then its subfolders by name.
+ * them), each followed by its variants, then its subfolders by name. The components in
+ * components/ are left out (a whole page there is still a design).
  */
 export function scanDesigns(baseDir) {
   const designs = [];
@@ -219,7 +224,7 @@ export function scanDesigns(baseDir) {
       if (!entry.isFile() || !/\.html?$/i.test(entry.name)) continue;
       const file = folder ? `${folder}/${entry.name}` : entry.name;
       const meta = readDesignMeta(path.join(dir, entry.name));
-      if (!meta || meta.skip) continue;
+      if (!meta || meta.skip || (folder === COMPONENTS_FOLDER && !meta.page)) continue;
       const base = fileDesign(file, folder, meta);
       designs.push(base);
       for (const variant of meta.variants) designs.push(variantDesign(base, variant));
@@ -230,6 +235,43 @@ export function scanDesigns(baseDir) {
   };
   walk(baseDir, '');
   return designs;
+}
+
+/**
+ * The components in the folder's components/, by name, as designs that show each one alone (its
+ * file's example, at components/<tag>.html?preview). For designs.json, which can show them.
+ * A component's file can give its preview's size with the same tag as a design.
+ */
+export function scanComponents(baseDir) {
+  const dir = path.join(baseDir, COMPONENTS_FOLDER);
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.html') && isTagName(entry.name.slice(0, -5)))
+    .sort((a, b) => byName(a.name, b.name))
+    .flatMap((entry) => {
+      const meta = readDesignMeta(path.join(dir, entry.name));
+      if (!meta || meta.skip || meta.page) return [];
+      const tag = entry.name.slice(0, -5);
+      const file = `${COMPONENTS_FOLDER}/${entry.name}`;
+      return [compact({
+        key: file,
+        file: `${file}?preview`,
+        folder: COMPONENTS_FOLDER,
+        id: designId(file),
+        title: `<${tag}>`,
+        description: meta.description,
+        width: meta.width || PREVIEW_WIDTH,
+        height: meta.height,
+        fit: !meta.height || undefined, // the frame is as tall as what it shows, however short
+        category: 'components',
+        component: true
+      })];
+    });
 }
 
 /** Designs grouped into one section per folder, in order (`rootName` for the files at the top) */
@@ -274,8 +316,13 @@ function resolveEntry(entry, byKey) {
   return design;
 }
 
-/** designs.json's sections filled from the files, then the designs it doesn't list */
-function curate(config, found) {
+/**
+ * designs.json's sections filled from the files, then the designs it doesn't list. Components
+ * (see scanComponents) show where it lists them, and all of them with "components": "show".
+ */
+function curate(config, designs, components = []) {
+  const showComponents = config.components === 'show' || config.components === true;
+  const found = [...designs, ...components];
   const byKey = new Map(found.map((d) => [d.key, d]));
   const sources = (Array.isArray(config.sections) ? config.sections : []).map((section) => ({
     section,
@@ -313,14 +360,16 @@ function curate(config, found) {
     owners.set(folders[0], owners.has(folders[0]) && owners.get(folders[0]) !== i ? -1 : i);
   });
 
-  const unlisted = found.filter((d) => !used.has(d.key));
+  const unlisted = found.filter((d) => !used.has(d.key) && (!d.component || showComponents));
   const rest = [];
   for (const design of unlisted) {
     const owner = owners.get(design.folder ?? '');
     if (owner !== undefined && owner >= 0) sections[owner].artboards.push(design);
-    else rest.push(design);
+    else if (design.component || config.unlisted !== 'hide') rest.push(design);
   }
-  if (config.unlisted !== 'hide') sections.push(...groupByFolder(rest, 'Unlisted'));
+  // Without sections of its own, designs.json only sets things: the files at the top keep a first
+  // row without a title, as without designs.json.
+  sections.push(...groupByFolder(rest, sources.length ? 'Unlisted' : ''));
 
   const { sections: _sections, ...top } = config;
   return { ...top, sections };
@@ -343,7 +392,7 @@ function finalize(manifest, prefix = '') {
       id: section.id ?? (slugify(name) || (folder ? slugify(folder.split('/').map(stripPrefix).join('-')) : `section-${i + 1}`)),
       name,
       artboards: artboards.map((design) => {
-        const { key, folder: _folder, baseTitle, variantOf, ...board } = design;
+        const { key, folder: _folder, baseTitle, variantOf, component, ...board } = design;
         const category = board.category ?? inferCategory(design.file.split('?')[0], board.width, board.height);
         return compact({
           ...board,
@@ -381,18 +430,16 @@ export function normalizeManifest(manifest, prefix = '') {
  */
 export function loadDesignsManifest(baseDir, rootDir = baseDir) {
   const prefix = path.relative(rootDir, baseDir).split(path.sep).join('/');
+  const title = path.basename(path.resolve(baseDir)) || 'Designs';
   const found = scanDesigns(baseDir);
   const configPath = path.join(baseDir, 'designs.json');
   if (fs.existsSync(configPath)) {
     try {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      return { ...finalize(curate(config, found), prefix), autoDiscovered: false };
+      return { ...finalize(curate({ title, ...config }, found, scanComponents(baseDir)), prefix), autoDiscovered: false };
     } catch (err) {
       console.warn(`[htmlboard] Failed parsing designs.json: ${err.message}. Showing the files without it.`);
     }
   }
-  return {
-    ...finalize({ title: path.basename(path.resolve(baseDir)) || 'Designs', sections: groupByFolder(found) }, prefix),
-    autoDiscovered: true
-  };
+  return { ...finalize({ title, sections: groupByFolder(found) }, prefix), autoDiscovered: true };
 }

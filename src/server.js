@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadDesignsManifest } from './designs.js';
+import { componentPreview } from './components.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -230,6 +231,19 @@ export function createServer(options = {}) {
     if (!isInside(rootDir, filePath)) {
       res.writeHead(403).end('Forbidden');
       return;
+    }
+
+    // A component alone, as the canvas shows it (components/<tag>.html?preview): its example in a page
+    if (parsedUrl.searchParams.has('preview')) {
+      const preview = componentPreview(targetDir, filePath);
+      if (preview !== null) {
+        res.writeHead(200, {
+          'Content-Type': MIME_TYPES['.html'],
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        });
+        res.end(preview);
+        return;
+      }
     }
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {

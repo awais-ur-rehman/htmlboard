@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from '../src/server.js';
 import { installSkills, uninstallSkills } from '../src/skills.js';
 import { planMigration, checkMigration, applyMigration } from '../src/migrate.js';
+import { installComponents, COMPONENTS_FOLDER, COMPONENTS_SCRIPT } from '../src/components.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +77,7 @@ Usage:
   npx htmlboard [directory] [options]
   htmlboard skills <install|uninstall> [options]   Teach your AI agent to use HtmlBoard
   htmlboard migrate [directory] [--write]          Move designs.json's sizes, titles and variants into the files
+  htmlboard components [directory] [--force]       Add components.js: files in components/ become custom elements
 
 Options:
   -p, --port <number>   Port to listen on (default: 3000)
@@ -94,6 +96,7 @@ Examples:
   htmlboard design --root .     # Artboards in ./design that link to ../css/…
   htmlboard --init              # Add sample designs to the current folder
   htmlboard skills install      # Add the HtmlBoard skill to this project's agents
+  htmlboard components designs  # Let ./designs use components (components/tx-item.html is <tx-item>)
 
 On the canvas:
   Drag, scroll          Move around
@@ -206,6 +209,46 @@ function runSkills(args) {
   }
 }
 
+function runComponents(args) {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+Usage:
+  htmlboard components [directory] [--force]
+
+Adds ${COMPONENTS_SCRIPT} and a ${COMPONENTS_FOLDER}/ folder to the designs folder (default: the current one).
+Each file in ${COMPONENTS_FOLDER}/ is then a custom element named after it (${COMPONENTS_FOLDER}/tx-item.html is
+<tx-item>) in the designs that load ${COMPONENTS_SCRIPT}, once, beside their stylesheet:
+
+  <script type="module" src="../${COMPONENTS_SCRIPT}"></script>
+
+A ${COMPONENTS_SCRIPT} that differs from this version's (an older one, or one you edited) is kept;
+--force replaces it.
+`);
+    return;
+  }
+  const unknown = args.find((arg) => arg.startsWith('-') && arg !== '--force' && arg !== '-f');
+  if (unknown) {
+    console.error(`[htmlboard] Unknown option: ${unknown} (see htmlboard components --help)`);
+    process.exit(1);
+  }
+  const dirArg = args.find((arg) => !arg.startsWith('-'));
+  const { path: dest, status } = installComponents({
+    dir: dirArg || process.cwd(),
+    force: args.includes('--force') || args.includes('-f')
+  });
+  const labels = {
+    installed: '\x1b[32m✓ added\x1b[0m',
+    updated: '\x1b[32m✓ updated\x1b[0m',
+    unchanged: '\x1b[90m= up to date\x1b[0m',
+    skipped: '\x1b[33m! differs from this version, kept (use --force to replace)\x1b[0m'
+  };
+  console.log(`  ${labels[status]}  ${path.relative(process.cwd(), dest) || dest}`);
+  if (status === 'installed') {
+    const folder = path.relative(process.cwd(), path.join(path.dirname(dest), COMPONENTS_FOLDER)) || COMPONENTS_FOLDER;
+    console.log(`\n  Write components in ${folder}/ (tx-item.html is <tx-item>) and load ${COMPONENTS_SCRIPT} in the designs.`);
+  }
+}
+
 function runMigrate(args) {
   const write = args.includes('--write');
   const dirArg = args.find((arg) => !arg.startsWith('-'));
@@ -263,6 +306,11 @@ async function main() {
 
   if (args[0] === 'skills') {
     runSkills(args.slice(1));
+    return;
+  }
+
+  if (args[0] === 'components') {
+    runComponents(args.slice(1));
     return;
   }
 
