@@ -4,7 +4,9 @@
 // so they stay sharp and readable at any zoom. The server lists the designs at /api/designs and
 // pushes saved files at /api/events.
 
-const FRAME_GAP = 120;     // canvas px between the designs of a section
+import { checkDesigns } from './check.js';
+
+const FRAME_GAP = 120;    // canvas px between the designs of a section
 const SECTION_GAP = 560;   // canvas px between sections
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
@@ -764,11 +766,64 @@ function connect() {
       // Not ours.
     }
   });
+  source.addEventListener('check', (event) => {
+    try {
+      takeCheck(JSON.parse(event.data));
+    } catch {
+      // Not ours.
+    }
+  });
   // EventSource keeps trying to reconnect by itself.
   source.addEventListener('error', () => {
     lost = true;
     setLive(false);
   });
+}
+
+// ---------------------------------------------------------------- checking (htmlboard check)
+
+let checking = Promise.resolve();
+
+// The server asks every open canvas: the first to claim a check does it, after the ones it's doing.
+async function takeCheck(request) {
+  let claimed = false;
+  try {
+    claimed = (await fetch(`/api/check/${request.id}/claim`, { method: 'POST' })).ok;
+  } catch {
+    // The server is gone
+  }
+  if (claimed) checking = checking.then(() => runCheck(request));
+}
+
+async function runCheck({ id, designs: boards }) {
+  const designs = boards.map((board) => {
+    const shown = state.designs.find((d) => d.file === board.file);
+    const height = Number(board.height) || 0;
+    return {
+      file: board.file,
+      title: board.title || board.file,
+      width: Number(board.width) || DEFAULT_SIZE[0],
+      height,
+      // Without a height, the frame is as tall as the canvas has it (as tall as its page)
+      frameHeight: height || (shown?.autoHeight ? shown.h : board.fit ? FIT_HEIGHT : DEFAULT_SIZE[1]),
+    };
+  });
+  const what = designs.length === 1 ? designs[0].title : `${designs.length} designs`;
+  toast(`Checking ${what}…`);
+  let report;
+  try {
+    report = { designs: await checkDesigns(designs) };
+  } catch (err) {
+    report = { error: String(err?.message || err) };
+  }
+  try {
+    await fetch(`/api/check/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report) });
+  } catch {
+    return;
+  }
+  const failing = (report.designs || []).filter((d) => d.problems.some((p) => p.level !== 'note')).length;
+  const verdict = !failing ? 'no problems' : designs.length === 1 ? 'problems found' : `${failing} with problems`;
+  toast(report.error ? `Couldn't check ${what}: ${report.error}` : `Checked ${what}: ${verdict}`);
 }
 
 function setLive(on) {

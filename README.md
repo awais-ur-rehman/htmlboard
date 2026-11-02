@@ -35,6 +35,7 @@ Modern AI agents and developers generate dozens of HTML mockups, layout variatio
 - 📂 **Designs That Describe Themselves**: Every HTML file is a design, each folder a section, number prefixes the order. A file says its own size, category and variants in a `<meta>` tag or two, so adding a design means writing one file — nothing to keep in sync.
 - 🧩 **Components**: Each file in `components/` is a custom element named after it (`tx-item.html` is `<tx-item>`), so the sidebar every screen shares is written once and used as one tag: attributes, slots and scoped CSS, built in the light DOM with your `styles.css`, no build step.
 - 🗂️ **A Catalog for Agents**: `htmlboard catalog` reads the project and prints what the designs share in a few lines: each stylesheet's variables and classes, the scripts, every component with its attributes, an example and where it's used. An agent learns your styles and components without reading every file, and since it's read from the files, it is never out of date.
+- 🩺 **Checks for Agents**: `htmlboard check` has the canvas open in your browser load each design again and report, as text, what went wrong: script errors, missing files and components, fonts that didn't load, content cut at the frame's edge, text cut off or spilling out of its box. An agent checks its work without screenshots.
 - 📐 **Optional `designs.json`**: Curates when you want it (section titles, order, overrides); designs it doesn't list still show at the end, or don't (`"unlisted": "hide"`). `htmlboard migrate` moves an existing one into the files.
 - 📱 **Device Filters**: **Mobile**, **Tablet** and **Desktop** (and **Components**, or your own categories) lay out just those designs, side by side, to compare them.
 - 🔎 **Search**: Find designs by name, file, tags or section (case and accents don't matter); the others fade out in place.
@@ -79,6 +80,7 @@ Usage:
   htmlboard migrate [directory] [--write]          Move designs.json's sizes, titles and variants into the files
   htmlboard components [directory] [--force]       Add components.js: files in components/ become custom elements
   htmlboard catalog [directory]                    What the designs share: stylesheets, scripts, components
+  htmlboard check [directory or file] [-p <port>]  What went wrong in the designs, from the canvas open in a browser
 
 Options:
   -p, --port <number>   Port to listen on (default: 3000)
@@ -114,6 +116,9 @@ htmlboard components design
 
 # What the designs in ./design share, in a few lines (what the agent skill reads)
 htmlboard catalog design
+
+# What went wrong in them: script errors, missing files, cut-off text (the canvas must be open)
+htmlboard check design
 
 # See what moving ./design/designs.json into its files would do, then do it
 htmlboard migrate design
@@ -191,6 +196,33 @@ It describes whatever the project has and asks for nothing:
 - **Components**: their attributes come from their markup (`{{name}}`), their script and their CSS (`&[warn]` is a flag, `&[size="lg"]` a value).
 
 On the samples it is 2 KB instead of the 9 KB of `styles.css` and `components/`, and the gap grows with the project: a stylesheet's rules don't show, only what they define.
+
+### Checking the designs: `htmlboard check`
+
+An agent can't see the canvas, and a screenshot costs it many tokens, when it can take one at all. `htmlboard check` asks the canvas open in your browser to look instead: each design loads again, out of sight, in a frame of its size, and what went wrong comes back as text:
+
+```text
+$ npx htmlboard check designs
+Checked 6 designs in designs (the canvas at http://localhost:3000): 2 with problems, 1 with notes.
+
+01-screens/02-customers.html · Customers
+  error  TypeError: Cannot read properties of null (reading 'append') (01-screens/02-customers.html:88)
+  error  <org-cel> isn't built: there is no components/org-cel.html
+  error  missing file: img/acme.svg (<img>)
+  layout cut at the right edge (the frame is 1280 px wide): table.table reaches 1342
+  layout text cut off by p.plan (overflow: hidden): "Enterprise annual plan"
+
+01-screens/03-mobile.html · Mobile
+  layout text spills out of .btn: "Confirm and continue"
+
+02-print/01-flyer.html · Flyer
+  note   content goes on below the frame, down to 1460 px (the frame is 1350 px tall)
+```
+
+- **What it finds:** script errors and `console.error`; files that aren't there (a stylesheet's fonts and images, a fetch's data too); components that weren't built; fonts that didn't load; a page that shows nothing; content cut at the frame's right edge; text cut off by a box that hides its overflow, or spilling out of its box. A note says when content goes on below a frame of fixed height: fine for a screen that scrolls, not for a flyer.
+- **What it leaves alone:** what a design means to do, such as text that ends in an ellipsis or is clamped, boxes that scroll, and content hidden or moved off the page on purpose. It doesn't judge looks (colors, spacing, alignment).
+- **It runs in your browser**, so the canvas must be open there. Each check loads the files as they are on disk, so it can run right after a save. Pages shown in frames get a small script first in their `<head>` (`/__explorer/probe.js`) to hear what goes wrong from the start; it only listens in the frames the check loads, and a design opened on its own doesn't get it.
+- A file or a folder checks just those designs: `htmlboard check designs/01-screens/02-customers.html`. It finds the canvas on ports 3000 to 3020 (`-p` for another) and exits with 1 when there are problems, 2 when it can't check. `--json` gives the report as data.
 
 ---
 
@@ -392,6 +424,16 @@ const catalog = buildCatalog('./designs'); // { root } for links that start with
 console.log(formatCatalog(catalog));
 ```
 
+And the check, which needs the canvas open in a browser (the server answers it at `GET /api/check`, `?only=<file or folder>` for some of the designs):
+
+```javascript
+import { runCheck, formatReport } from 'htmlboard';
+
+const { canvas, report } = await runCheck('./designs'); // { port } when it isn't on 3000 to 3020
+// → report: { dir, root, designs: [{ file, title, width, height, problems: [{ level: 'error', kind: 'missing', path: '/img/logo.png', tag: 'img' }, …] }, …] }
+console.log(formatReport(report, { url: canvas.url }));
+```
+
 ---
 
 ## 📂 Project Structure
@@ -406,12 +448,15 @@ htmlboard/
 │   ├── designs.js        # Which designs a folder holds: files, their tags, designs.json
 │   ├── components.js     # Components: their previews, `htmlboard components`
 │   ├── catalog.js        # What the designs share: `htmlboard catalog`
+│   ├── check.js          # `htmlboard check`: asks the canvas, prints its report
 │   ├── migrate.js        # `htmlboard migrate`
 │   ├── skills.js         # `htmlboard skills` installer
 │   ├── client/           # The canvas
 │   │   ├── index.html    # Explorer shell: list, canvas, toolbar, shortcuts
 │   │   ├── explorer.css  # Dark chrome, dot grid
 │   │   ├── explorer.js   # Layout, pan/zoom, search, live reload
+│   │   ├── check.js      # Checks the designs in frames out of sight, for `htmlboard check`
+│   │   ├── probe.js      # Notes script errors and failed loads in the frames the check loads
 │   │   ├── favicon.svg, logo.svg, mark.svg
 │   │   └── fonts/        # Inter and Bricolage Grotesque (OFL)
 │   └── templates/        # The sample designs `--init` adds

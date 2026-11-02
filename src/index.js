@@ -32,6 +32,11 @@ export {
 } from './catalog.js';
 
 export {
+  runCheck,
+  formatReport
+} from './check.js';
+
+export {
   installSkills,
   uninstallSkills,
   SKILLS_DIR,

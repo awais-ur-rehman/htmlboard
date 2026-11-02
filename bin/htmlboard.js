@@ -9,6 +9,7 @@ import { installSkills, uninstallSkills } from '../src/skills.js';
 import { planMigration, checkMigration, applyMigration } from '../src/migrate.js';
 import { installComponents, COMPONENTS_FOLDER, COMPONENTS_SCRIPT } from '../src/components.js';
 import { buildCatalog, formatCatalog } from '../src/catalog.js';
+import { runCheck, formatReport, hasProblems, CheckError } from '../src/check.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,6 +81,7 @@ Usage:
   htmlboard migrate [directory] [--write]          Move designs.json's sizes, titles and variants into the files
   htmlboard components [directory] [--force]       Add components.js: files in components/ become custom elements
   htmlboard catalog [directory]                    What the designs share: stylesheets, scripts, components
+  htmlboard check [directory or file] [-p <port>]  What went wrong in the designs, from the canvas open in a browser
 
 Options:
   -p, --port <number>   Port to listen on (default: 3000)
@@ -100,6 +102,7 @@ Examples:
   htmlboard skills install      # Add the HtmlBoard skill to this project's agents
   htmlboard components designs  # Let ./designs use components (components/tx-item.html is <tx-item>)
   htmlboard catalog designs     # What ./designs share, in a few lines (for your AI agent)
+  htmlboard check designs       # Script errors, missing files, cut-off text in ./designs
 
 On the canvas:
   Drag, scroll          Move around
@@ -252,6 +255,12 @@ A ${COMPONENTS_SCRIPT} that differs from this version's (an older one, or one yo
   }
 }
 
+// A folder as the user would type it: from the current folder, unless that means going up
+function shownPath(dir) {
+  const rel = path.relative(process.cwd(), dir);
+  return !rel ? '.' : rel.startsWith('..') ? dir : rel;
+}
+
 function runCatalog(args) {
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
@@ -287,7 +296,51 @@ Options:
     console.error(`[htmlboard] ${err.message}`);
     process.exit(1);
   }
-  process.stdout.write(formatCatalog(catalog, { name: path.relative(process.cwd(), catalog.dir) || '.' }));
+  process.stdout.write(formatCatalog(catalog, { name: shownPath(catalog.dir) }));
+}
+
+async function runCheckCommand(args) {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+Usage:
+  htmlboard check [directory or file] [-p <port>] [--json]
+
+Has the canvas running for the designs (open in a browser: the check runs there) load each one
+afresh and prints what went wrong, in a few lines of text: script errors and console.error, files
+that aren't there, components that weren't built, fonts that didn't load, content cut at the
+frame's edge, text cut off or spilling out of its box. A directory checks the designs in it, a
+file just that design (default: the current directory).
+
+Exits with 1 when it finds problems, 2 when it can't check (no canvas running, or none open).
+
+Options:
+  -p, --port <number>   The canvas's port (default: found on 3000 to 3020)
+      --json            The report as JSON
+`);
+    return;
+  }
+  let port;
+  let asJson = false;
+  const targets = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--port' || arg === '-p') port = parseInt(args[++i], 10);
+    else if (arg.startsWith('--port=')) port = parseInt(arg.slice('--port='.length), 10);
+    else if (arg === '--json') asJson = true;
+    else if (arg.startsWith('-')) {
+      console.error(`[htmlboard] Unknown option: ${arg} (see htmlboard check --help)`);
+      process.exit(2);
+    } else targets.push(arg);
+  }
+  try {
+    const { canvas, report } = await runCheck(targets[0], { port });
+    if (asJson) console.log(JSON.stringify(report, null, 2));
+    else process.stdout.write(formatReport(report, { name: shownPath(report.dir), url: canvas.url }));
+    process.exitCode = hasProblems(report) ? 1 : 0;
+  } catch (err) {
+    console.error(err instanceof CheckError ? err.message : `[htmlboard] ${err.message}`);
+    process.exitCode = 2;
+  }
 }
 
 function runMigrate(args) {
@@ -362,6 +415,11 @@ async function main() {
 
   if (args[0] === 'catalog') {
     runCatalog(args.slice(1));
+    return;
+  }
+
+  if (args[0] === 'check') {
+    await runCheckCommand(args.slice(1));
     return;
   }
 

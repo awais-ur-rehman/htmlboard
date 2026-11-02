@@ -2,6 +2,7 @@ import http from 'node:http';
 import net from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadDesignsManifest } from './designs.js';
 import { componentPreview } from './components.js';
@@ -32,6 +33,50 @@ const MIME_TYPES = {
   '.txt': 'text/plain; charset=utf-8',
   '.mp4': 'video/mp4'
 };
+
+// The probe (client/probe.js) notes what goes wrong while a page builds, for `htmlboard check`. It
+// goes first in the pages the canvas shows in frames, before anything that could go wrong.
+const PROBE = Buffer.from('<script src="/__explorer/probe.js"></script>');
+
+/** A page with the probe first in it: in its <head>, else after <html> or <!DOCTYPE>, else first */
+export function withProbe(page) {
+  const text = page.toString('latin1'); // a byte per character: positions in it are positions in page
+  for (const tag of [/<head\b[^>]*>/i, /<html\b[^>]*>/i, /<!doctype\b[^>]*>/i]) {
+    const match = tag.exec(text);
+    if (match) {
+      const at = match.index + match[0].length;
+      return Buffer.concat([page.subarray(0, at), PROBE, page.subarray(at)]);
+    }
+  }
+  return Buffer.concat([PROBE, page]);
+}
+
+function json(res, status, body) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(body));
+}
+
+function readBody(req, limit = 16 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error('Too large'));
+        req.destroy();
+      } else {
+        chunks.push(chunk);
+      }
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+/** How long a canvas has to take a check (htmlboard check), then to do it */
+const CLAIM_MS = 15000;
+const CHECK_MS = 180000;
 
 /** True when target is base itself or inside it */
 function isInside(base, target) {
@@ -153,12 +198,105 @@ export function createServer(options = {}) {
   if (!isInside(rootDir, targetDir)) {
     throw new Error(`The designs folder (${targetDir}) must be inside the root (${rootDir})`);
   }
-  const manifestFile = path.posix.join(path.relative(rootDir, targetDir).split(path.sep).join('/'), 'designs.json');
+  const designsPath = path.relative(rootDir, targetDir).split(path.sep).join('/'); // '' when they're the same
+  const manifestFile = path.posix.join(designsPath, 'designs.json');
   const clients = new Set();
+
+  const send = (event, data) => {
+    for (const client of clients) client.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Checks (htmlboard check). GET /api/check asks the canvases open in a browser (over the live
+  // reload events) to check the designs; the first to claim the check does it, and what it posts
+  // back answers the request.
+  const checks = new Map(); // id → { res, claimed, timer }
+
+  function endCheck(id, status, body) {
+    const check = checks.get(id);
+    if (!check) return;
+    clearTimeout(check.timer);
+    checks.delete(id);
+    json(check.res, status, body);
+  }
+
+  // only: files or folders (from the designs folder) to check; all the designs when there's none
+  function startCheck(res, only) {
+    const wanted = only.map((item) => item.replace(/\\/g, '/').replace(/^\.?\/+|\/+$/g, ''));
+    const designs = loadDesignsManifest(targetDir, rootDir).sections
+      .flatMap((section) => section.artboards)
+      .map(({ file, title, width, height, fit }) => ({ file, title, width, height, fit }))
+      .filter(({ file }) => {
+        const own = (designsPath ? file.slice(designsPath.length + 1) : file).split('?')[0];
+        return !wanted.length || wanted.some((item) => !item || own === item || own.startsWith(`${item}/`));
+      });
+    if (!designs.length) {
+      json(res, 404, { error: wanted.some(Boolean) ? `No design on the canvas is in ${only.join(', ')}` : 'There are no designs to check' });
+      return;
+    }
+    if (!clients.size) {
+      json(res, 409, { error: "The canvas isn't open in a browser" });
+      return;
+    }
+    const id = randomUUID();
+    const check = {
+      res,
+      claimed: false,
+      timer: setTimeout(() => endCheck(id, 504, { error: "The canvas didn't take the check (reload it in the browser)" }), CLAIM_MS)
+    };
+    checks.set(id, check);
+    res.on('close', () => {
+      if (checks.get(id) !== check) return; // answered
+      clearTimeout(check.timer);
+      checks.delete(id);
+    });
+    send('check', { id, designs });
+  }
+
+  function claimCheck(id, res) {
+    const check = checks.get(id);
+    if (!check || check.claimed) {
+      json(res, 409, { error: 'Taken' });
+      return;
+    }
+    check.claimed = true;
+    clearTimeout(check.timer);
+    check.timer = setTimeout(() => endCheck(id, 504, { error: `The canvas didn't finish the check in ${CHECK_MS / 1000} s` }), CHECK_MS);
+    json(res, 200, { ok: true });
+  }
+
+  async function finishCheck(id, req, res) {
+    let report;
+    try {
+      report = JSON.parse(await readBody(req));
+    } catch {
+      json(res, 400, { error: 'Not a report' });
+      return;
+    }
+    if (!checks.get(id)?.claimed) {
+      json(res, 404, { error: 'No such check' });
+      return;
+    }
+    if (report.error) endCheck(id, 500, { error: `The canvas couldn't check the designs: ${report.error}` });
+    else endCheck(id, 200, { dir: targetDir, root: rootDir, designs: Array.isArray(report.designs) ? report.designs : [] });
+    res.writeHead(204).end();
+  }
 
   const server = http.createServer((req, res) => {
     const parsedUrl = new URL(req.url, 'http://localhost');
     let pathname = decodeURIComponent(parsedUrl.pathname);
+
+    // API: checking the designs (htmlboard check), which the canvas does
+    if (pathname === '/api/check' && req.method === 'GET') {
+      startCheck(res, parsedUrl.searchParams.getAll('only'));
+      return;
+    }
+    if (pathname.startsWith('/api/check/') && req.method === 'POST') {
+      const [id, action, ...rest] = pathname.slice('/api/check/'.length).split('/');
+      if (action === 'claim' && !rest.length) claimCheck(id, res);
+      else if (action === undefined) finishCheck(id, req, res);
+      else json(res, 404, { error: 'Not found' });
+      return;
+    }
 
     // API: Designs Manifest
     if (pathname === '/api/designs') {
@@ -203,7 +341,7 @@ export function createServer(options = {}) {
 
     // Serve HtmlBoard Explorer client files
     if (pathname === '/' || pathname === '/index.html') {
-      serveStaticFile(path.join(CLIENT_DIR, 'index.html'), res);
+      serveStaticFile(path.join(CLIENT_DIR, 'index.html'), req, res);
       return;
     }
 
@@ -215,7 +353,7 @@ export function createServer(options = {}) {
         res.writeHead(403).end('Forbidden');
         return;
       }
-      serveStaticFile(clientFilePath, res);
+      serveStaticFile(clientFilePath, req, res);
       return;
     }
 
@@ -233,6 +371,9 @@ export function createServer(options = {}) {
       return;
     }
 
+    // The pages the canvas shows in frames get the probe (htmlboard check); a page opened on its own doesn't
+    const framed = req.headers['sec-fetch-dest'] === 'iframe';
+
     // A component alone, as the canvas shows it (components/<tag>.html?preview): its example in a page
     if (parsedUrl.searchParams.has('preview')) {
       const preview = componentPreview(targetDir, filePath);
@@ -241,29 +382,32 @@ export function createServer(options = {}) {
           'Content-Type': MIME_TYPES['.html'],
           'Cache-Control': 'no-cache, no-store, must-revalidate'
         });
-        res.end(preview);
+        res.end(framed ? withProbe(Buffer.from(preview)) : preview);
         return;
       }
     }
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      serveStaticFile(filePath, res);
+      serveStaticFile(filePath, req, res, { probe: framed });
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end(`File not found: ${pathname}`);
     }
   });
 
-  function serveStaticFile(filePath, res) {
+  function serveStaticFile(filePath, req, res, { probe = false } = {}) {
     try {
       const ext = path.extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-      const content = fs.readFileSync(filePath);
+      // HEAD (htmlboard check asks which files are there) needs no reading
+      let content = req.method === 'HEAD' ? null : fs.readFileSync(filePath);
+      if (content && probe && (ext === '.html' || ext === '.htm')) content = withProbe(content);
       res.writeHead(200, {
         'Content-Type': contentType,
         'Cache-Control': 'no-cache, no-store, must-revalidate'
       });
-      res.end(content);
+      if (content) res.end(content);
+      else res.end();
     } catch {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Error reading file');
@@ -285,15 +429,12 @@ export function createServer(options = {}) {
         const files = [...changed];
         changed.clear();
         for (const [file, isFolder] of files) {
-          const eventData = JSON.stringify({
+          send('change', {
             type: file === manifestFile ? 'manifest' : isFolder ? 'folder' : 'file',
             file,
             isHtml: !isFolder && /\.html?$/i.test(file),
             timestamp: Date.now()
           });
-          for (const client of clients) {
-            client.write(`event: change\ndata: ${eventData}\n\n`);
-          }
         }
       }, 100);
     });
@@ -308,6 +449,7 @@ export function createServer(options = {}) {
     close: () => {
       clearTimeout(watchDebounceTimer);
       if (stopWatching) stopWatching();
+      for (const id of [...checks.keys()]) endCheck(id, 503, { error: 'htmlboard stopped' });
       for (const client of clients) {
         client.end();
       }
