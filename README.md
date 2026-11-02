@@ -270,7 +270,7 @@ A component is a piece of HTML, `components/tx-item.html`:
 - **`components.js` is a file in your project**, so designs work on any static server. `--init` adds it; `htmlboard components [dir]` adds it to a designs folder. After upgrading htmlboard, `htmlboard components [dir] --force` replaces an older copy (and any edits you made to it).
 - **Saving a component reloads the designs that use it.** Component files aren't designs; `designs.json` can show them on the canvas (below).
 - **`htmlboard catalog` lists them** with their attributes, the example each one starts with and the designs that use them.
-- HTML has no self-closing custom elements: write `<tx-item …></tx-item>`, not `<tx-item />`. And a component can't be a table row: the browser moves it out of the `<table>`.
+- HTML has no self-closing custom elements: write `<tx-item …></tx-item>`, not `<tx-item />`. And a component can't be a table's row or cell itself (the browser moves it out of the `<table>`), but it works inside a cell: `<td><org-cell …></org-cell></td>`.
 
 ---
 

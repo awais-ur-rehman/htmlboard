@@ -98,7 +98,7 @@ A component file is a piece of HTML (no `<!DOCTYPE>`, `<html>`, `<head>` or `<bo
 - Its `<style>` only reaches inside the element, which is a block box unless `&` says otherwise. `styles.css` applies inside too: build with its classes (`card`, `btn`, `muted`) and name the component's own parts with names it doesn't use. A design's own `<style>` comes after and can restyle one element, but its selectors reach inside components too, so keep them specific.
 - `<script>` runs for each element once it is built, with `this` as the element. Use it sparingly, a few lines for what markup and CSS can't do, like marking the current link (`<app-sidebar active="Customers">`) or a toggle. No fetching, data or frameworks.
 - Relative links in a component start from its file (`../01-screens/02-customers.html`).
-- Close the tag: `<tx-item …></tx-item>`, never `<tx-item />`. A component can't be a table row or cell (the browser moves it out of the `<table>`): make the whole table a component, or use a grid. Where it sits (fixed, margins, the grid around it) belongs to the design.
+- Close the tag: `<tx-item …></tx-item>`, never `<tx-item />`. A component can't be a table's row or cell itself (the browser moves it out of the `<table>`), but it works inside a cell: `<td><org-cell …></org-cell></td>`. Where it sits (fixed, margins, the grid around it) belongs to the design.
 - Editing a component changes every design that uses it, like `styles.css`.
 
 ## Group and order
