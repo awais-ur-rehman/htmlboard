@@ -19,7 +19,7 @@ npx htmlboard designs --open
 - `-p <port>` picks the port. `--init` adds sample designs; skip it unless the user wants a starter.
 - If the artboards link to files above the designs folder (`../css/theme.css`), serve from the project root: `npx htmlboard design --root .`
 - An empty folder gets the samples automatically, so write your first artboard before starting the server.
-- If a server is already running for this folder, reuse it. `GET /api/health` answers `{"status":"ok","dir":…}`.
+- Running it again for a folder that already has a canvas doesn't start another: it prints that canvas's URL.
 
 ## Write an artboard
 

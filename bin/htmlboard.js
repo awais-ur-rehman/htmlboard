@@ -10,6 +10,7 @@ import { planMigration, checkMigration, applyMigration } from '../src/migrate.js
 import { installComponents, COMPONENTS_FOLDER, COMPONENTS_SCRIPT } from '../src/components.js';
 import { buildCatalog, formatCatalog } from '../src/catalog.js';
 import { runCheck, formatReport, hasProblems, CheckError } from '../src/check.js';
+import { PORTS, findCanvases } from '../src/canvases.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -451,6 +452,25 @@ async function main() {
   if (!options.init && !entries.some((e) => !e.startsWith('.'))) {
     console.log(`[htmlboard] Directory is empty. Adding sample designs...`);
     scaffoldProject(targetDir);
+  }
+
+  // A canvas already running for this folder (same root, same version): say where, rather than
+  // starting a second one on the next port
+  const root = options.root ? path.resolve(options.root) : targetDir;
+  const running = (await findCanvases([...PORTS, ...Array.from({ length: 21 }, (_, i) => options.port + i)]))
+    .filter((canvas) => canvas.dir === targetDir && canvas.root === root);
+  const same = running.find((canvas) => canvas.version === pkg.version);
+  if (same) {
+    console.log(`
+  \x1b[90mhtml\x1b[0m\x1b[1mboard\x1b[0m is already running for this folder:
+
+  \x1b[32m➜\x1b[0m  \x1b[1mLocal:\x1b[0m   \x1b[36m${same.url}\x1b[0m
+`);
+    if (options.open) openBrowser(same.url);
+    return;
+  }
+  for (const canvas of running) {
+    console.log(`[htmlboard] v${canvas.version} is running for this folder at ${canvas.url}; starting v${pkg.version} too.`);
   }
 
   try {

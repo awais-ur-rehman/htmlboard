@@ -1,47 +1,17 @@
-import http from 'node:http';
 import path from 'node:path';
+import { PORTS, get, findCanvases } from './canvases.js';
 
 // `htmlboard check`: the canvas running for a folder, open in a browser, loads its designs and says
 // what went wrong in each (see client/check.js); this finds that canvas, asks it, and puts the
 // answer in a few lines of text.
 
-/** Where htmlboard listens unless told otherwise: 3000, or the next free port */
-const PORTS = Array.from({ length: 21 }, (_, i) => 3000 + i);
-
 /** A problem the check couldn't get past (no canvas running, none open in a browser): exit code 2 */
 export class CheckError extends Error {}
-
-function get(url, { timeout = 0 } = {}) {
-  return new Promise((resolve, reject) => {
-    const req = http.get(url, (res) => {
-      const chunks = [];
-      res.on('data', (chunk) => chunks.push(chunk));
-      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
-      res.on('error', reject);
-    });
-    req.on('error', reject);
-    if (timeout) req.setTimeout(timeout, () => req.destroy(new Error('timeout')));
-  });
-}
 
 const isInside = (base, target) => {
   const rel = path.relative(base, target);
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
-
-/** The htmlboard servers listening on these ports, each with its designs folder (dir) and root */
-async function findCanvases(ports) {
-  const found = await Promise.all(ports.map(async (port) => {
-    try {
-      const { status, body } = await get(`http://127.0.0.1:${port}/api/health`, { timeout: 1500 });
-      const health = JSON.parse(body);
-      return status === 200 && health.status === 'ok' && health.dir ? { ...health, port, url: `http://localhost:${port}` } : null;
-    } catch {
-      return null;
-    }
-  }));
-  return found.filter(Boolean);
-}
 
 /**
  * Check designs with the canvas that shows them: a designs folder, a folder in it, or a design's

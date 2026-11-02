@@ -93,6 +93,8 @@ Options:
   -h, --help            Display help message
 ```
 
+Running `htmlboard` for a folder it already shows (same folder and root, same version) doesn't start a second canvas on the next port: it prints the running one's URL, and opens it with `--open`.
+
 ### Examples
 
 ```bash
