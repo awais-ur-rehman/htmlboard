@@ -9,6 +9,7 @@ import { installSkills, uninstallSkills, SKILLS_DIR } from '../src/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.join(__dirname, '..', 'bin', 'htmlboard.js');
+const SKILLS = ['htmlboard', 'htmlboard-components', 'htmlboard-designs-json'];
 
 describe('Agent skills', () => {
   let tmp;
@@ -21,19 +22,26 @@ describe('Agent skills', () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  test('bundled skill has a valid SKILL.md frontmatter', () => {
-    const skill = fs.readFileSync(path.join(SKILLS_DIR, 'htmlboard', 'SKILL.md'), 'utf8');
-    const frontmatter = skill.match(/^---\n([\s\S]*?)\n---\n/);
-    assert.ok(frontmatter, 'SKILL.md starts with a frontmatter block');
-    assert.match(frontmatter[1], /^name: htmlboard$/m);
-    assert.match(frontmatter[1], /^description: .{20,1024}$/m);
+  test('each bundled skill has a valid SKILL.md frontmatter, named after its folder', () => {
+    const bundled = fs.readdirSync(SKILLS_DIR).filter((name) => fs.existsSync(path.join(SKILLS_DIR, name, 'SKILL.md'))).sort();
+    assert.deepEqual(bundled, SKILLS);
+    for (const name of SKILLS) {
+      const skill = fs.readFileSync(path.join(SKILLS_DIR, name, 'SKILL.md'), 'utf8');
+      const frontmatter = skill.match(/^---\n([\s\S]*?)\n---\n/);
+      assert.ok(frontmatter, `${name}: SKILL.md starts with a frontmatter block`);
+      assert.match(frontmatter[1], new RegExp(`^name: ${name}$`, 'm'));
+      assert.match(frontmatter[1], /^description: .{20,1024}$/m);
+    }
+    // The main skill says when to use the others
+    const main = fs.readFileSync(path.join(SKILLS_DIR, 'htmlboard', 'SKILL.md'), 'utf8');
+    for (const name of SKILLS.slice(1)) assert.ok(main.includes(`**${name}**`), name);
   });
 
-  test('installSkills copies the skill for every agent by default', () => {
+  test('installSkills copies the skills for every agent by default', () => {
     const results = installSkills({ dir: tmp });
-    assert.deepEqual(results.map((r) => r.status), ['installed', 'installed']);
+    assert.deepEqual(results.map((r) => r.status), Array(SKILLS.length * 2).fill('installed'));
     for (const target of ['.claude/skills', '.agents/skills']) {
-      assert.ok(fs.existsSync(path.join(tmp, target, 'htmlboard', 'SKILL.md')));
+      for (const name of SKILLS) assert.ok(fs.existsSync(path.join(tmp, target, name, 'SKILL.md')), `${target}/${name}`);
     }
   });
 
@@ -57,15 +65,15 @@ describe('Agent skills', () => {
     assert.doesNotMatch(fs.readFileSync(installed, 'utf8'), /My own notes/);
   });
 
-  test('uninstallSkills removes only the htmlboard skill', () => {
+  test('uninstallSkills removes only the htmlboard skills', () => {
     installSkills({ dir: tmp });
     fs.mkdirSync(path.join(tmp, '.claude/skills/other'), { recursive: true });
 
     const results = uninstallSkills({ dir: tmp });
-    assert.deepEqual(results.map((r) => r.status), ['removed', 'removed']);
-    assert.ok(!fs.existsSync(path.join(tmp, '.claude/skills/htmlboard')));
+    assert.deepEqual(results.map((r) => r.status), Array(SKILLS.length * 2).fill('removed'));
+    for (const name of SKILLS) assert.ok(!fs.existsSync(path.join(tmp, '.claude/skills', name)));
     assert.ok(fs.existsSync(path.join(tmp, '.claude/skills/other')));
-    assert.deepEqual(uninstallSkills({ dir: tmp }).map((r) => r.status), ['absent', 'absent']);
+    assert.deepEqual(uninstallSkills({ dir: tmp }).map((r) => r.status), Array(SKILLS.length * 2).fill('absent'));
   });
 
   test('CLI: htmlboard skills install', () => {

@@ -100,7 +100,7 @@ Examples:
   htmlboard ./designs -p 8080   # Serve ./designs on port 8080
   htmlboard design --root .     # Artboards in ./design that link to ../css/…
   htmlboard --init              # Add sample designs to the current folder
-  htmlboard skills install      # Add the HtmlBoard skill to this project's agents
+  htmlboard skills install      # Add the HtmlBoard skills to this project's agents
   htmlboard components designs  # Let ./designs use components (components/tx-item.html is <tx-item>)
   htmlboard catalog designs     # What ./designs share, in a few lines (for your AI agent)
   htmlboard check designs       # Script errors, missing files, cut-off text in ./designs
@@ -155,8 +155,8 @@ function scaffoldProject(targetDir) {
 function showSkillsHelp() {
   console.log(`
 Usage:
-  htmlboard skills install [options]     Copy the HtmlBoard skill into your agents' skill folders
-  htmlboard skills uninstall [options]   Remove it
+  htmlboard skills install [options]     Copy the HtmlBoard skills into your agents' skill folders
+  htmlboard skills uninstall [options]   Remove them
 
 Options:
   -g, --global          Install for your user (~/.claude/skills, ~/.agents/skills) instead of this project
@@ -212,7 +212,7 @@ function runSkills(args) {
     console.log(`  ${labels[status]}  ${path.relative(process.cwd(), dest) || dest}`);
   }
   if (action === 'install' && results.some((r) => r.status === 'installed' || r.status === 'updated')) {
-    console.log(`\n  Restart your agent session to load the skill, then ask it for a design.`);
+    console.log(`\n  Restart your agent session to load the skills, then ask it for a design.`);
   }
 }
 

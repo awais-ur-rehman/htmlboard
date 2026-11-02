@@ -21,7 +21,8 @@ export const SKILL_TARGETS = {
 function bundledSkills() {
   return fs.readdirSync(SKILLS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(SKILLS_DIR, entry.name, 'SKILL.md')))
-    .map((entry) => entry.name);
+    .map((entry) => entry.name)
+    .sort();
 }
 
 function resolveTargets(agent = 'all') {

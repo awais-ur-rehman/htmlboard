@@ -133,31 +133,39 @@ htmlboard migrate design --write
 
 HtmlBoard is built from the ground up to pair with AI coding agents (Claude, Gemini, Codex, ChatGPT, Antigravity, Cursor).
 
-### Install the agent skill
+### Install the agent skills
 
-HtmlBoard ships an [Agent Skill](https://agentskills.io) that teaches your agent how to use it: where to put artboards, how to size, name and group them (files describe themselves; `designs.json` is optional) and how to start the canvas. Install it in your project:
+HtmlBoard ships [Agent Skills](https://agentskills.io) that teach your agent how to use it. An agent keeps only each skill's one-line description in mind and reads a skill when a task calls for it, so the ones it rarely needs cost almost nothing until then:
+
+| Skill | What it teaches | Read |
+| :--- | :--- | :--- |
+| `htmlboard` | Start the canvas; write, size, name and group designs; shared styles; size and state variants; the catalog and the check | For any design work |
+| `htmlboard-components` | The component file: attributes, slots, scoped CSS, a script, its first-line example | Before writing or changing a component |
+| `htmlboard-designs-json` | Curating the canvas with `designs.json`, and `htmlboard migrate` | When the designs folder has a `designs.json` |
+
+Install them in your project:
 
 ```bash
 npx htmlboard skills install
 ```
 
-This writes `.claude/skills/htmlboard/` (Claude Code) and `.agents/skills/htmlboard/` (Codex and other agents that read `.agents/skills`). Commit them so everyone working on the project gets the skill. Then start a new agent session and just ask for a design.
+This writes them in `.claude/skills/` (Claude Code) and `.agents/skills/` (Codex and other agents that read `.agents/skills`). Commit them so everyone working on the project gets them. Then start a new agent session and just ask for a design.
 
 ```bash
 npx htmlboard skills install --global         # for your user (~/.claude/skills, ~/.agents/skills), all projects
 npx htmlboard skills install --agent claude   # only one agent: claude | agents | all (default)
 npx htmlboard skills install --force          # update a copy you edited locally
-npx htmlboard skills uninstall                # remove it (accepts the same --global / --agent)
+npx htmlboard skills uninstall                # remove them (accepts the same --global / --agent)
 ```
 
-Running `install` again after upgrading HtmlBoard updates the skill; a copy you edited is kept unless you pass `--force`.
+Running `install` again after upgrading HtmlBoard updates the skills; a copy you edited is kept unless you pass `--force`.
 
 ### The workflow
 
 1. **Ask your LLM to generate artboards:**
    > *"Create 3 design explorations for our checkout flow in `designs/03-checkout/`."*
 
-   With the skill, the agent writes `01-one-page.html`, `02-steps.html`, `03-express.html`, each with its size in a `<meta>` tag. They show up as a new "checkout" row, in that order.
+   With the skills, the agent writes `01-one-page.html`, `02-steps.html`, `03-express.html`, each with its size in a `<meta>` tag. They show up as a new "checkout" row, in that order.
 
 2. **Run HtmlBoard in the background:**
    ```bash
@@ -469,7 +477,9 @@ htmlboard/
 │       ├── 01-screens/   # Dashboard, customers, mobile feed
 │       └── 02-ui-kit/
 ├── skills/
-│   └── htmlboard/        # Agent skill (SKILL.md) copied by `htmlboard skills install`
+│   ├── htmlboard/        # Agent skills (SKILL.md each) copied by `htmlboard skills install`
+│   ├── htmlboard-components/
+│   └── htmlboard-designs-json/
 ├── brand/                # The logo's files (from design/tools/logo.py)
 ├── design/               # htmlboard's own designs, on its own canvas: `npx htmlboard design --root .`
 ├── package.json
