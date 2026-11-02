@@ -23,4 +23,5 @@ let npm read the token from there.
    `npm whoami` should print `luizcarlos1405`; then `+ htmlboard@x.y.z` means it was published.
 5. Push the commit and its tag: `git push origin main --follow-tags`.
 6. Check the release. The registry can take a few minutes to list a new version:
-   `npm view htmlboard version --prefer-online`, then `npx -y htmlboard@x.y.z --version` in another folder.
+   `npm view htmlboard version --prefer-online`, then `npx -y --prefer-online htmlboard@x.y.z --version`
+   in another folder. Without `--prefer-online`, npm may answer from its cache that the version doesn't exist.
