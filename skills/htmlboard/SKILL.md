@@ -23,7 +23,7 @@ npx htmlboard designs --open
 
 ## Write an artboard
 
-One design per file, with its facts in the `<head>`, linking the shared stylesheet (see below):
+One design per file, with its facts in the `<head>`, linking the shared stylesheet and components (see below):
 
 ```html
 <!DOCTYPE html>
@@ -33,7 +33,8 @@ One design per file, with its facts in the `<head>`, linking the shared styleshe
   <title>Checkout · one page</title>                         <!-- its name on the canvas -->
   <meta name="description" content="Address and payment on one screen">
   <meta name="htmlboard" content="width=390, height=844">   <!-- its size -->
-  <link rel="stylesheet" href="../styles.css">              <!-- shared tokens and components -->
+  <link rel="stylesheet" href="../styles.css">              <!-- shared tokens and classes -->
+  <script type="module" src="../components.js"></script>    <!-- shared components -->
   <style>
     .screen { height: 844px; /* only what this design needs */ }
   </style>
@@ -58,7 +59,7 @@ Put what the designs share in one stylesheet instead of repeating it in every fi
 - If there is none and the project already has a stylesheet or design tokens, link those. Otherwise create `styles.css` with your first design: colors, type and spacing as custom properties, the base styles, and the components you'll repeat.
 - Link it with a relative path: `styles.css` from the top of the folder, `../styles.css` from a section folder.
 - A design's own `<style>` holds only what is specific to it. When a second design needs the same thing, move it to `styles.css`.
-- Split it when it grows (`components/forms.css`, `charts.css`) and link the extra files where they are used.
+- Split it when it grows (`forms.css`, `charts.css`) and link the extra files where they are used.
 - Editing `styles.css` restyles every design that links it, which is the point for a product's screens. For one-off explorations that should keep their look (a different style, logo options), style them in their own file instead.
 
 More tags, all optional:
@@ -67,6 +68,38 @@ More tags, all optional:
 - `<meta name="htmlboard:variant" content="?theme=dark · dark">` shows the same file again with that query string, named "<title> · dark". Use it for states the page builds from its URL (themes, empty or error states, data). Add one tag per variant; they follow the file.
 - `<meta name="htmlboard:label" content="light">` adds a label to the name of the file's own frame ("Checkout · light"), to tell it from its variants.
 - `<meta name="htmlboard" content="skip">` leaves a file out (partials, templates, a page that isn't a design).
+
+## Components
+
+Markup that designs repeat (a sidebar, a tab bar, a list row, a card with content) goes in a component, so a design writes one tag instead of the block: `<tx-item icon="☕" name="Blue Bottle" amount="-$6.75"></tx-item>`.
+
+- `components/tx-item.html`, at the top of the designs folder, is `<tx-item>`: the file name is the tag, with a hyphen and no number prefix. Designs load `components.js` once (above). If the folder has no `components.js`, run `npx htmlboard components <designs folder>`.
+- Before writing a design, see what exists: each component's first line shows how to use it (`head -n 1 components/*.html`). Use them; don't copy their markup into designs.
+- Make one when a second design repeats a block (or a design repeats it three times). Not for what a `styles.css` class already does (`<button class="btn btn-primary">` is short), nor in one-off explorations.
+
+A component file is a piece of HTML (no `<!DOCTYPE>`, `<html>`, `<head>` or `<body>`):
+
+```html
+<!-- <tx-item icon="💼" name="Invoice #1042" meta="Yesterday" amount="+$3,450.00" positive></tx-item> -->
+<div class="icon">{{icon}}</div>
+<div class="what"><b>{{name}}</b> <span class="muted">{{meta}}</span></div>
+<div class="amount">{{amount}}</div>
+
+<style>
+  & { display: flex; align-items: center; gap: 14px; }   /* & is the element itself */
+  .icon { width: 40px; height: 40px; border-radius: 12px; background: var(--surface-2); }
+  &[positive] .amount { color: var(--emerald); }
+</style>
+```
+
+- First line: a comment with an example of use, with real values, every attribute and its variants side by side. It is the component's documentation and its preview on the canvas.
+- `{{name}}` is the element's `name="…"` attribute, as text. Content goes in slots: `<slot></slot>` takes the element's children, `<slot name="actions"></slot>` its children with `slot="actions"`, and what a slot holds shows when nothing fills it.
+- No logic in the markup: variants are attributes styled in CSS (`&[positive]`), and a list is several elements.
+- Its `<style>` only reaches inside the element, which is a block box unless `&` says otherwise. `styles.css` applies inside too: build with its classes (`card`, `btn`, `muted`) and name the component's own parts with names it doesn't use. A design's own `<style>` comes after and can restyle one element, but its selectors reach inside components too, so keep them specific.
+- `<script>` runs for each element once it is built, with `this` as the element. Use it sparingly, a few lines for what markup and CSS can't do, like marking the current link (`<app-sidebar active="Customers">`) or a toggle. No fetching, data or frameworks.
+- Relative links in a component start from its file (`../01-screens/02-customers.html`).
+- Close the tag: `<tx-item …></tx-item>`, never `<tx-item />`. A component can't be a table row or cell (the browser moves it out of the `<table>`): make the whole table a component, or use a grid. Where it sits (fixed, margins, the grid around it) belongs to the design.
+- Editing a component changes every design that uses it, like `styles.css`.
 
 ## Group and order
 
@@ -85,12 +118,12 @@ More tags, all optional:
 }
 ```
 
-An entry is a file name (its variants follow it), or `{ "file", "title", "width", "height", "category", "description" }` to override the file. `"folder"` brings a whole folder. `npx htmlboard migrate <folder>` moves an old designs.json's sizes, names and variants into the files (`--write` to apply; without it, it only shows the plan).
+An entry is a file name (its variants follow it), or `{ "file", "title", "width", "height", "category", "description" }` to override the file. `"folder"` brings a whole folder. Components aren't on the canvas unless designs.json says `"components": "show"` (or lists `components/<tag>.html`): each shows alone, from its first-line example, 480 wide unless its file has `<meta name="htmlboard" content="width=…">`. `npx htmlboard migrate <folder>` moves an old designs.json's sizes, names and variants into the files (`--write` to apply; without it, it only shows the plan).
 
 ## Live reload
 
 - Saving an artboard's HTML reloads just that frame; the user's view stays put. A new name or size in its `<head>` updates in place.
-- Saving a file artboards use (a stylesheet, a script, an image, data) reloads the artboards that loaded it.
+- Saving a file artboards use (a stylesheet, a component, a script, an image, data) reloads the artboards that loaded it.
 - Adding, removing or moving artboards, or saving `designs.json`, rebuilds the canvas.
 
 ## Working with the user

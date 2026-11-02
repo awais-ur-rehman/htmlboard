@@ -31,8 +31,9 @@ Modern AI agents and developers generate dozens of HTML mockups, layout variatio
 
 - 🛸 **Infinite Canvas**: Drag or scroll to move, <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll or pinch to zoom (2% to 800%), with a mouse, a trackpad or a touch screen. Names and section titles stay sharp at any zoom, and the dot grid keeps its spacing.
 - ⚡ **Zero Dependencies**: Pure native Node.js ES modules, fonts included. Runs instantly with `npx htmlboard`, offline too.
-- 🔄 **State-Preserving Live Reload**: The server watches the project and pushes every save (Server-Sent Events). Saving a design reloads its frame; saving a file designs use (a stylesheet, a script, an image, data) reloads just the designs that loaded it; new, removed and renamed designs show up by themselves. Your view never moves.
+- 🔄 **State-Preserving Live Reload**: The server watches the project and pushes every save (Server-Sent Events). Saving a design reloads its frame; saving a file designs use (a stylesheet, a component, a script, an image, data) reloads just the designs that loaded it; new, removed and renamed designs show up by themselves. Your view never moves.
 - 📂 **Designs That Describe Themselves**: Every HTML file is a design, each folder a section, number prefixes the order. A file says its own size, category and variants in a `<meta>` tag or two, so adding a design means writing one file — nothing to keep in sync.
+- 🧩 **Components**: Each file in `components/` is a custom element named after it (`tx-item.html` is `<tx-item>`), so the sidebar every screen shares is written once and used as one tag: attributes, slots and scoped CSS, built in the light DOM with your `styles.css`, no build step.
 - 📐 **Optional `designs.json`**: Curates when you want it (section titles, order, overrides); designs it doesn't list still show at the end, or don't (`"unlisted": "hide"`). `htmlboard migrate` moves an existing one into the files.
 - 📱 **Device Filters**: **Mobile**, **Tablet** and **Desktop** (and **Components**, or your own categories) lay out just those designs, side by side, to compare them.
 - 🔎 **Search**: Find designs by name, file, tags or section (case and accents don't matter); the others fade out in place.
@@ -59,7 +60,7 @@ htmlboard
 
 ### Scaffold a Starter Project
 
-To start with sample designs (a folder of screens and a folder of components, each file describing itself, all sharing one `styles.css`):
+To start with sample designs (a folder of screens and a UI kit, each file describing itself, all sharing one `styles.css` and four components):
 
 ```bash
 npx htmlboard --init
@@ -75,6 +76,7 @@ Usage:
   npx htmlboard [directory] [options]
   htmlboard skills <install|uninstall> [options]   Teach your AI agent to use HtmlBoard
   htmlboard migrate [directory] [--write]          Move designs.json's sizes, titles and variants into the files
+  htmlboard components [directory] [--force]       Add components.js: files in components/ become custom elements
 
 Options:
   -p, --port <number>   Port to listen on (default: 3000)
@@ -104,6 +106,9 @@ htmlboard design --root .
 
 # Start a new folder with sample designs
 htmlboard ./my-new-ui --init --open
+
+# Let the designs in ./design use components
+htmlboard components design
 
 # See what moving ./design/designs.json into its files would do, then do it
 htmlboard migrate design
@@ -154,7 +159,7 @@ Running `install` again after upgrading HtmlBoard updates the skill; a copy you 
 
 ## 📂 How Designs Are Found
 
-Every `.html` file under the folder is a design (hidden folders, `node_modules`, `dist` and `build` aside):
+Every `.html` file under the folder is a design (hidden folders, `node_modules`, `dist`, `build` and the [components](#-components) in `components/` aside):
 
 - **Sections are folders.** Each folder is a row on the canvas, named after the folder; the files at the top of the folder make a first row without a title.
 - **Number prefixes set the order** of files and folders: `01-…`, `02-…`, `10-…` (up to three digits; `2` comes before `10`). They don't show in names or in links, so reordering breaks nothing.
@@ -180,7 +185,54 @@ Every `.html` file under the folder is a design (hidden folders, `node_modules`,
 
 **Categories** drive the filters. Left out, they come from words in the path, then from the size when it is a screen's (a phone's width, a tablet's 3:4, a desktop's landscape); flyers, boards and other formats get none and show under **All**.
 
-**Shared styles.** Designs link one stylesheet for what they share (tokens, base styles, components) and keep only their own CSS in their `<style>`, so they stay consistent and each new design is shorter to write. The samples use a `styles.css` at the top of the folder (`<link rel="stylesheet" href="../styles.css">`), and the agent skill tells LLMs to read it, use it and grow it. Editing it reloads every design that links it.
+**Shared styles.** Designs link one stylesheet for what they share (tokens, base styles, classes like `.btn` and `.card`) and keep only their own CSS in their `<style>`, so they stay consistent and each new design is shorter to write. The samples use a `styles.css` at the top of the folder (`<link rel="stylesheet" href="../styles.css">`), and the agent skill tells LLMs to read it, use it and grow it. Editing it reloads every design that links it.
+
+---
+
+## 🧩 Components
+
+Designs repeat markup too: the same sidebar on every screen, a dozen rows of a list. Written as a component, it is one tag in each design, and one file to change. Every file in `components/` (at the top of the designs folder) is a custom element named after it, built by `components.js`, which designs load once next to their stylesheet:
+
+```html
+<link rel="stylesheet" href="../styles.css">
+<script type="module" src="../components.js"></script>
+…
+<app-sidebar active="Customers"></app-sidebar>
+<tx-item icon="☕" name="Blue Bottle Coffee" meta="Oct 26 • Food & Beverage" amount="-$6.75"></tx-item>
+```
+
+A component is a piece of HTML, `components/tx-item.html`:
+
+```html
+<!-- <tx-item icon="💼" name="Client Invoice #1042" meta="Yesterday" amount="+$3,450.00" positive></tx-item> -->
+<div class="icon">{{icon}}</div>
+<div class="what">
+  <div class="name">{{name}}</div>
+  <div class="muted">{{meta}}</div>
+</div>
+<div class="amount">{{amount}}</div>
+
+<style>
+  & { display: flex; align-items: center; gap: 14px; }
+  .icon { width: 40px; height: 40px; border-radius: 12px; background: var(--surface-2); }
+  &[positive] .amount { color: var(--emerald); }
+</style>
+```
+
+| In the file | What it does |
+| :--- | :--- |
+| A comment first | An example of use: the component's documentation, for people and agents, and its preview on the canvas. |
+| `{{name}}` | The element's `name="…"` attribute, as text. |
+| `<slot>`, `<slot name="x">` | The element's content; its children with `slot="x"`. What a slot holds shows when nothing fills it. |
+| `<style>` | CSS for this element only (`&` is the element, a block box by default), added once to the pages that use it. |
+| `<script>` | Runs for each element once it is built, with `this` as the element: for the little that markup and CSS can't do, like marking the current link. |
+
+- **They work with your stylesheet.** Components are built in the light DOM, with no shadow root in the way, so `styles.css` reaches inside: they use the same classes as the designs (`card`, `btn`, `muted`). A component's CSS comes after `styles.css` and before the design's own `<style>`, so a design can still adjust one element.
+- **Variants are attributes styled in CSS** (`&[positive]`). There is no template logic to learn; a list is several elements.
+- **Relative links start from the component's file**, so they work from every design.
+- **`components.js` is a file in your project**, so designs work on any static server. `--init` adds it; `htmlboard components [dir]` adds it to a designs folder. After upgrading htmlboard, `htmlboard components [dir] --force` replaces an older copy (and any edits you made to it).
+- **Saving a component reloads the designs that use it.** Component files aren't designs; `designs.json` can show them on the canvas (below).
+- HTML has no self-closing custom elements: write `<tx-item …></tx-item>`, not `<tx-item />`. And a component can't be a table row: the browser moves it out of the `<table>`.
 
 ---
 
@@ -206,6 +258,7 @@ A `designs.json` in the folder curates the canvas when folders aren't enough: se
 - Sections come in their order, designs in theirs. An entry is a file name, or `{ "file", … }` with values that win over the file's (`title`, `description`, `width`, `height`, `category`, `tags`, `id`). A `file` may carry a query string to place a variant itself.
 - A file's variants follow it unless designs.json lists them. `"folder"` brings a whole folder (in prefix order).
 - **Designs it doesn't list still show**, after the ones it does: in the section that holds their folder, else in their folder's own section (the files at the top in "Unlisted"). `"unlisted": "hide"` shows only what it lists.
+- **Components show on the canvas with `"components": "show"`**, each alone in its frame, from the example its file starts with, in a "components" section after the designs. They are 480 wide, unless the component's file says `<meta name="htmlboard" content="width=1040">`. A section can also list them (`"components/tx-item.html"`) or bring them all (`"folder": "components"`). A `designs.json` that only says `{ "components": "show" }` leaves the rest of the canvas as the files make it.
 - `name` and `artboards` are synonyms of `title` and `designs`.
 
 ### Moving an existing `designs.json` into the files
@@ -279,6 +332,15 @@ installSkills({ dir: process.cwd(), agent: 'all' });
 // → [{ skill: 'htmlboard', path: '…/.claude/skills/htmlboard', status: 'installed' }, …]
 ```
 
+And so is the components installer:
+
+```javascript
+import { installComponents } from 'htmlboard';
+
+installComponents({ dir: './designs' });
+// → { path: '…/designs/components.js', status: 'installed' }
+```
+
 ---
 
 ## 📂 Project Structure
@@ -291,6 +353,7 @@ htmlboard/
 │   ├── index.js          # Library entry point & API exports
 │   ├── server.js         # HTTP server, SSE live reload
 │   ├── designs.js        # Which designs a folder holds: files, their tags, designs.json
+│   ├── components.js     # Components: their previews, `htmlboard components`
 │   ├── migrate.js        # `htmlboard migrate`
 │   ├── skills.js         # `htmlboard skills` installer
 │   ├── client/           # The canvas
@@ -300,9 +363,11 @@ htmlboard/
 │   │   ├── favicon.svg, logo.svg, mark.svg
 │   │   └── fonts/        # Inter and Bricolage Grotesque (OFL)
 │   └── templates/        # The sample designs `--init` adds
-│       ├── styles.css    # Their shared tokens and components
-│       ├── 01-screens/   # Desktop dashboard, mobile feed
-│       └── 02-components/
+│       ├── styles.css    # Their shared tokens and classes
+│       ├── components.js # Turns components/*.html into custom elements (copied into projects)
+│       ├── components/   # Sidebar, top bar, stat card, transaction row
+│       ├── 01-screens/   # Dashboard, customers, mobile feed
+│       └── 02-ui-kit/
 ├── skills/
 │   └── htmlboard/        # Agent skill (SKILL.md) copied by `htmlboard skills install`
 ├── brand/                # The logo's files (from design/tools/logo.py)
