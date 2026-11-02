@@ -55,7 +55,7 @@ One design per file, with its facts in the `<head>`, linking the shared styleshe
 
 Put what the designs share in one stylesheet instead of repeating it in every file: it keeps the designs consistent and spares writing the same CSS again.
 
-- The designs folder has a `styles.css` at its top (sample projects start with one). Read it before writing a design and use its tokens (`var(--accent)`) and classes (`.btn`, `.card`, …).
+- The designs folder has a `styles.css` at its top (sample projects start with one). Before writing a design, see what the designs already share: `npx htmlboard catalog <designs folder>` prints it in a few lines, read from the files (each stylesheet's variables and classes, the scripts, the components with their attributes and an example). Use what fits (`var(--accent)`, `.btn`, `<tx-item>`) and add what's missing; open a file only for what the list doesn't say.
 - If there is none and the project already has a stylesheet or design tokens, link those. Otherwise create `styles.css` with your first design: colors, type and spacing as custom properties, the base styles, and the components you'll repeat.
 - Link it with a relative path: `styles.css` from the top of the folder, `../styles.css` from a section folder.
 - A design's own `<style>` holds only what is specific to it. When a second design needs the same thing, move it to `styles.css`.
@@ -74,7 +74,7 @@ More tags, all optional:
 Markup that designs repeat (a sidebar, a tab bar, a list row, a card with content) goes in a component, so a design writes one tag instead of the block: `<tx-item icon="☕" name="Blue Bottle" amount="-$6.75"></tx-item>`.
 
 - `components/tx-item.html`, at the top of the designs folder, is `<tx-item>`: the file name is the tag, with a hyphen and no number prefix. Designs load `components.js` once (above). If the folder has no `components.js`, run `npx htmlboard components <designs folder>`.
-- Before writing a design, see what exists: each component's first line shows how to use it (`head -n 1 components/*.html`). Use them; don't copy their markup into designs.
+- The catalog (above) lists them, with their attributes, an example and the designs that use them. Use them; don't copy their markup into designs.
 - Make one when a second design repeats a block (or a design repeats it three times). Not for what a `styles.css` class already does (`<button class="btn btn-primary">` is short), nor in one-off explorations.
 
 A component file is a piece of HTML (no `<!DOCTYPE>`, `<html>`, `<head>` or `<body>`):
@@ -92,7 +92,7 @@ A component file is a piece of HTML (no `<!DOCTYPE>`, `<html>`, `<head>` or `<bo
 </style>
 ```
 
-- First line: a comment with an example of use, with real values, every attribute and its variants side by side. It is the component's documentation and its preview on the canvas.
+- First line: a comment with an example of use, with real values, every attribute and its variants side by side. The catalog shows it, and it is the component's preview on the canvas.
 - `{{name}}` is the element's `name="…"` attribute, as text. Content goes in slots: `<slot></slot>` takes the element's children, `<slot name="actions"></slot>` its children with `slot="actions"`, and what a slot holds shows when nothing fills it.
 - No logic in the markup: variants are attributes styled in CSS (`&[positive]`), and a list is several elements.
 - Its `<style>` only reaches inside the element, which is a block box unless `&` says otherwise. `styles.css` applies inside too: build with its classes (`card`, `btn`, `muted`) and name the component's own parts with names it doesn't use. A design's own `<style>` comes after and can restyle one element, but its selectors reach inside components too, so keep them specific.

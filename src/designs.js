@@ -97,7 +97,8 @@ function decode(text) {
   });
 }
 
-function attributes(tag) {
+/** The attributes of an HTML tag (`<meta name="x" content="y">`), names in lowercase, values decoded */
+export function attributes(tag) {
   const attrs = {};
   for (const m of tag.matchAll(/([^\s"'<>/=]+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g)) {
     attrs[m[1].toLowerCase()] = decode(m[2] ?? m[3] ?? m[4] ?? '');

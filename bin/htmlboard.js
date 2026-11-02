@@ -8,6 +8,7 @@ import { startServer } from '../src/server.js';
 import { installSkills, uninstallSkills } from '../src/skills.js';
 import { planMigration, checkMigration, applyMigration } from '../src/migrate.js';
 import { installComponents, COMPONENTS_FOLDER, COMPONENTS_SCRIPT } from '../src/components.js';
+import { buildCatalog, formatCatalog } from '../src/catalog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +79,7 @@ Usage:
   htmlboard skills <install|uninstall> [options]   Teach your AI agent to use HtmlBoard
   htmlboard migrate [directory] [--write]          Move designs.json's sizes, titles and variants into the files
   htmlboard components [directory] [--force]       Add components.js: files in components/ become custom elements
+  htmlboard catalog [directory]                    What the designs share: stylesheets, scripts, components
 
 Options:
   -p, --port <number>   Port to listen on (default: 3000)
@@ -97,6 +99,7 @@ Examples:
   htmlboard --init              # Add sample designs to the current folder
   htmlboard skills install      # Add the HtmlBoard skill to this project's agents
   htmlboard components designs  # Let ./designs use components (components/tx-item.html is <tx-item>)
+  htmlboard catalog designs     # What ./designs share, in a few lines (for your AI agent)
 
 On the canvas:
   Drag, scroll          Move around
@@ -249,6 +252,44 @@ A ${COMPONENTS_SCRIPT} that differs from this version's (an older one, or one yo
   }
 }
 
+function runCatalog(args) {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+Usage:
+  htmlboard catalog [directory] [--root <path>]
+
+Prints what the designs in the folder (default: the current one) share, read from the files: the
+stylesheets and scripts they load, each local stylesheet's variables, classes, @keyframes and
+fonts, and the components in ${COMPONENTS_FOLDER}/ with their attributes, slots, example and where
+they are used. A few lines instead of every file, for the AI agent that writes the designs.
+
+Options:
+  -r, --root <path>   The folder the canvas serves (htmlboard … --root), for links that start
+                      with "/" (default: the designs folder)
+`);
+    return;
+  }
+  let root;
+  const dirs = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--root' || arg === '-r') root = args[++i];
+    else if (arg.startsWith('--root=')) root = arg.slice('--root='.length);
+    else if (arg.startsWith('-')) {
+      console.error(`[htmlboard] Unknown option: ${arg} (see htmlboard catalog --help)`);
+      process.exit(1);
+    } else dirs.push(arg);
+  }
+  let catalog;
+  try {
+    catalog = buildCatalog(dirs[0] || process.cwd(), { root });
+  } catch (err) {
+    console.error(`[htmlboard] ${err.message}`);
+    process.exit(1);
+  }
+  process.stdout.write(formatCatalog(catalog, { name: path.relative(process.cwd(), catalog.dir) || '.' }));
+}
+
 function runMigrate(args) {
   const write = args.includes('--write');
   const dirArg = args.find((arg) => !arg.startsWith('-'));
@@ -316,6 +357,11 @@ async function main() {
 
   if (args[0] === 'migrate') {
     runMigrate(args.slice(1));
+    return;
+  }
+
+  if (args[0] === 'catalog') {
+    runCatalog(args.slice(1));
     return;
   }
 

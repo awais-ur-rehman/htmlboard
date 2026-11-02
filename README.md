@@ -34,6 +34,7 @@ Modern AI agents and developers generate dozens of HTML mockups, layout variatio
 - 🔄 **State-Preserving Live Reload**: The server watches the project and pushes every save (Server-Sent Events). Saving a design reloads its frame; saving a file designs use (a stylesheet, a component, a script, an image, data) reloads just the designs that loaded it; new, removed and renamed designs show up by themselves. Your view never moves.
 - 📂 **Designs That Describe Themselves**: Every HTML file is a design, each folder a section, number prefixes the order. A file says its own size, category and variants in a `<meta>` tag or two, so adding a design means writing one file — nothing to keep in sync.
 - 🧩 **Components**: Each file in `components/` is a custom element named after it (`tx-item.html` is `<tx-item>`), so the sidebar every screen shares is written once and used as one tag: attributes, slots and scoped CSS, built in the light DOM with your `styles.css`, no build step.
+- 🗂️ **A Catalog for Agents**: `htmlboard catalog` reads the project and prints what the designs share in a few lines: each stylesheet's variables and classes, the scripts, every component with its attributes, an example and where it's used. An agent learns your styles and components without reading every file, and since it's read from the files, it is never out of date.
 - 📐 **Optional `designs.json`**: Curates when you want it (section titles, order, overrides); designs it doesn't list still show at the end, or don't (`"unlisted": "hide"`). `htmlboard migrate` moves an existing one into the files.
 - 📱 **Device Filters**: **Mobile**, **Tablet** and **Desktop** (and **Components**, or your own categories) lay out just those designs, side by side, to compare them.
 - 🔎 **Search**: Find designs by name, file, tags or section (case and accents don't matter); the others fade out in place.
@@ -77,6 +78,7 @@ Usage:
   htmlboard skills <install|uninstall> [options]   Teach your AI agent to use HtmlBoard
   htmlboard migrate [directory] [--write]          Move designs.json's sizes, titles and variants into the files
   htmlboard components [directory] [--force]       Add components.js: files in components/ become custom elements
+  htmlboard catalog [directory]                    What the designs share: stylesheets, scripts, components
 
 Options:
   -p, --port <number>   Port to listen on (default: 3000)
@@ -109,6 +111,9 @@ htmlboard ./my-new-ui --init --open
 
 # Let the designs in ./design use components
 htmlboard components design
+
+# What the designs in ./design share, in a few lines (what the agent skill reads)
+htmlboard catalog design
 
 # See what moving ./design/designs.json into its files would do, then do it
 htmlboard migrate design
@@ -155,6 +160,38 @@ Running `install` again after upgrading HtmlBoard updates the skill; a copy you 
 3. **Watch the canvas update live:**
    As the LLM writes or refines each HTML file, HtmlBoard detects the file change and reloads the iframe on the canvas immediately. You never have to refresh your browser or hunt for file URLs.
 
+### What the designs share: `htmlboard catalog`
+
+Before an agent writes a new design, it needs to know what the others use: the stylesheet's variables and classes, the components and how to write them. Reading every file for that costs tokens in every session. `htmlboard catalog` reads them instead and prints a summary (the skill runs it). On the samples, shortened:
+
+```text
+$ npx htmlboard catalog designs
+designs: 4 designs. Paths below are from this folder.
+
+Stylesheets
+  styles.css · all 4 designs
+    :root { --bg: #0b0d13; --surface: #141724; --surface-2: #1c2030; --border: #23283c;
+      --text: #f1f5f9; --text-muted: #94a3b8; --text-subtle: #64748b; --accent: #6366f1; … }
+    classes .muted .label .row .page-title .page-sub .app .app-main .app-content .card .btn
+      .btn-primary .btn-secondary .btn-outline .btn-danger .badge .badge-dot .badge-emerald …
+
+Scripts
+  components.js · all 4 designs
+
+Components (components/)
+  <stat-card label value trend [warn]> · 2 designs: 01-screens/01-dashboard.html, 02-ui-kit/01-overview.html
+    e.g. <stat-card label="Monthly Recurring Revenue" value="$184,290" trend="▲ +12.4% vs last mo"></stat-card> …
+  <tx-item icon name meta amount [positive]> · 2 designs: 01-screens/03-mobile.html, 02-ui-kit/01-overview.html
+    e.g. <tx-item icon="💼" name="Client Invoice #1042" meta="Yesterday • Wire Transfer" amount="+$3,450.00" positive></tx-item> …
+```
+
+It describes whatever the project has and asks for nothing:
+- **Stylesheets** with any name, in any folder: the ones the designs link or `@import` (CDN ones by their URL), and the ones at the top of the folder that no design links yet.
+- **Variables** under the selector that declares them, so a dark theme's values show too.
+- **Components**: their attributes come from their markup (`{{name}}`), their script and their CSS (`&[warn]` is a flag, `&[size="lg"]` a value).
+
+On the samples it is 2 KB instead of the 9 KB of `styles.css` and `components/`, and the gap grows with the project: a stylesheet's rules don't show, only what they define.
+
 ---
 
 ## 📂 How Designs Are Found
@@ -185,7 +222,7 @@ Every `.html` file under the folder is a design (hidden folders, `node_modules`,
 
 **Categories** drive the filters. Left out, they come from words in the path, then from the size when it is a screen's (a phone's width, a tablet's 3:4, a desktop's landscape); flyers, boards and other formats get none and show under **All**.
 
-**Shared styles.** Designs link one stylesheet for what they share (tokens, base styles, classes like `.btn` and `.card`) and keep only their own CSS in their `<style>`, so they stay consistent and each new design is shorter to write. The samples use a `styles.css` at the top of the folder (`<link rel="stylesheet" href="../styles.css">`), and the agent skill tells LLMs to read it, use it and grow it. Editing it reloads every design that links it.
+**Shared styles.** Designs link one stylesheet for what they share (tokens, base styles, classes like `.btn` and `.card`) and keep only their own CSS in their `<style>`, so they stay consistent and each new design is shorter to write. The samples use a `styles.css` at the top of the folder (`<link rel="stylesheet" href="../styles.css">`), and the agent skill tells LLMs to look it up (`htmlboard catalog`), use it and grow it. Editing it reloads every design that links it.
 
 ---
 
@@ -232,6 +269,7 @@ A component is a piece of HTML, `components/tx-item.html`:
 - **Relative links start from the component's file**, so they work from every design.
 - **`components.js` is a file in your project**, so designs work on any static server. `--init` adds it; `htmlboard components [dir]` adds it to a designs folder. After upgrading htmlboard, `htmlboard components [dir] --force` replaces an older copy (and any edits you made to it).
 - **Saving a component reloads the designs that use it.** Component files aren't designs; `designs.json` can show them on the canvas (below).
+- **`htmlboard catalog` lists them** with their attributes, the example each one starts with and the designs that use them.
 - HTML has no self-closing custom elements: write `<tx-item …></tx-item>`, not `<tx-item />`. And a component can't be a table row: the browser moves it out of the `<table>`.
 
 ---
@@ -341,6 +379,19 @@ installComponents({ dir: './designs' });
 // → { path: '…/designs/components.js', status: 'installed' }
 ```
 
+And the catalog, as data or as the text `htmlboard catalog` prints:
+
+```javascript
+import { buildCatalog, formatCatalog } from 'htmlboard';
+
+const catalog = buildCatalog('./designs'); // { root } for links that start with "/", like --root
+// → { designs: ['01-screens/01-dashboard.html', …],
+//     stylesheets: [{ path: 'styles.css', users: [{ design: '01-screens/01-dashboard.html' }, …], variables, classes, keyframes, fonts }, …],
+//     scripts: [{ path: 'components.js', users }],
+//     components: [{ tag: 'tx-item', attributes: [{ name: 'icon' }, …, { name: 'positive', flag: true }], slots, example, users }, …] }
+console.log(formatCatalog(catalog));
+```
+
 ---
 
 ## 📂 Project Structure
@@ -354,6 +405,7 @@ htmlboard/
 │   ├── server.js         # HTTP server, SSE live reload
 │   ├── designs.js        # Which designs a folder holds: files, their tags, designs.json
 │   ├── components.js     # Components: their previews, `htmlboard components`
+│   ├── catalog.js        # What the designs share: `htmlboard catalog`
 │   ├── migrate.js        # `htmlboard migrate`
 │   ├── skills.js         # `htmlboard skills` installer
 │   ├── client/           # The canvas

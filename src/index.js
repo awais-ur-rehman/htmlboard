@@ -27,6 +27,11 @@ export {
 } from './components.js';
 
 export {
+  buildCatalog,
+  formatCatalog
+} from './catalog.js';
+
+export {
   installSkills,
   uninstallSkills,
   SKILLS_DIR,
