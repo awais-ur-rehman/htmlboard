@@ -30,10 +30,12 @@ const escape = (text) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt
 const isRelative = (url) => url.trim() !== '' && !/^\s*([a-z][a-z\d+.-]*:|[/#?]|\{\{)/i.test(url);
 const absolute = (el, attribute, base) => new URL(el.getAttribute(attribute), base).href;
 
-// The elements of tags nobody defined yet, in root and under it, load their components.
+// The elements of tags nobody defined yet, in root and under it, load their components. A custom
+// element's name has a hyphen: other elements can be undefined too (<tr is="…">), and aren't ours.
 function discover(root) {
-  if (root.matches(':not(:defined)')) load(root.localName);
-  for (const el of root.querySelectorAll(':not(:defined)')) load(el.localName);
+  for (const el of [root, ...root.querySelectorAll(':not(:defined)')]) {
+    if (el.localName.includes('-') && el.matches(':not(:defined)')) load(el.localName);
+  }
 }
 
 function load(tag) {
