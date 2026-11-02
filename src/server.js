@@ -224,7 +224,7 @@ export function createServer(options = {}) {
     const wanted = only.map((item) => item.replace(/\\/g, '/').replace(/^\.?\/+|\/+$/g, ''));
     const designs = loadDesignsManifest(targetDir, rootDir).sections
       .flatMap((section) => section.artboards)
-      .map(({ file, title, width, height, fit }) => ({ file, title, width, height, fit }))
+      .map(({ id, file, title, width, height, fit }) => ({ id, file, title, width, height, fit }))
       .filter(({ file }) => {
         const own = (designsPath ? file.slice(designsPath.length + 1) : file).split('?')[0];
         return !wanted.length || wanted.some((item) => !item || own === item || own.startsWith(`${item}/`));

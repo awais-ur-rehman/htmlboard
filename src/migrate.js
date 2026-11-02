@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadDesignsManifest, parseDesignMeta, stripPrefix } from './designs.js';
+import { loadDesignsManifest, parseDesignMeta, stripPrefix, formatVariant } from './designs.js';
 
 // `htmlboard migrate`: moves what a designs.json says about each design into the design's own file
 // (its size, category, label, variants and description) and leaves designs.json with what only it
@@ -110,7 +110,7 @@ export function planMigration(designsDir) {
       }
       for (const key of ['description', 'tags', 'id']) if (item.entry[key] !== undefined) item.keep[key] = item.entry[key];
     }
-    for (const v of declared) lines.push(`<meta name="htmlboard:variant" content="${escapeAttr(v.query + (v.label ? SEP + v.label : ''))}">`);
+    for (const v of declared) lines.push(`<meta name="htmlboard:variant" content="${escapeAttr(formatVariant(v))}">`);
 
     const next = rewriteHead(html, lines);
     if (next !== html) files.push({ file: base, lines, html: next });

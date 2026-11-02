@@ -797,7 +797,7 @@ async function takeCheck(request) {
 
 async function runCheck({ id, designs: boards }) {
   const designs = boards.map((board) => {
-    const shown = state.designs.find((d) => d.file === board.file);
+    const shown = state.designs.find((d) => d.id === board.id); // a size variant has its file's URL
     const height = Number(board.height) || 0;
     return {
       file: board.file,

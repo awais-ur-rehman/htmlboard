@@ -242,6 +242,7 @@ Every `.html` file under the folder is a design (hidden folders, `node_modules`,
 <meta name="htmlboard" content="width=390, height=844">         <!-- its size (and category=…) -->
 <meta name="htmlboard:label" content="light">                   <!-- added to its name: "Checkout · light" -->
 <meta name="htmlboard:variant" content="?theme=dark · dark">    <!-- one more frame: "Checkout · dark" -->
+<meta name="htmlboard:variant" content="width=768, height=1024 · tablet">  <!-- and at a tablet's size -->
 ```
 
 | Tag | What it says |
@@ -250,7 +251,7 @@ Every `.html` file under the folder is a design (hidden folders, `node_modules`,
 | `<meta name="description">` | Its description, shown in the list and found by the search. |
 | `<meta name="htmlboard" content="…">` | `width=…`, `height=…`, `category=…` (`mobile`, `tablet`, `desktop`, `components` or your own word), or `skip` to leave the file out (partials, templates). |
 | `<meta name="htmlboard:label">` | Text added to the name of the file's own frame, when it has variants. |
-| `<meta name="htmlboard:variant">` | One more frame of the same file with that query string, then its label. As many as you like; they follow the file. |
+| `<meta name="htmlboard:variant">` | One more frame of the same file: with a query string (`?theme=dark`), at another size (`width=390, height=844`, so a responsive page shows on a phone too), or both; then its label. As many as you like; they follow the file. |
 
 **Sizes.** The width is the frame's viewport: the page's CSS needs it before it renders. Give the height for designs of a fixed size (a phone screen, a flyer: the frame is that tall and cuts the rest); leave it out and the frame grows with the page. Without a size, words in the path decide (`mobile` → 390 × 844, `tablet` → 768 × 1024, `desktop` → 1280 × 800, `component` → 720 × 600), else 1200 wide.
 

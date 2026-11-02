@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseDesignMeta, loadDesignsManifest } from '../src/index.js';
 import { planMigration, checkMigration, applyMigration } from '../src/migrate.js';
+import { formatVariant } from '../src/designs.js';
 
 const page = (head = '', title = 'Page') => `<!doctype html>\n<html>\n<head>\n  <title>${title}</title>\n${head}</head>\n<body><main>x</main></body>\n</html>\n`;
 
@@ -27,6 +28,24 @@ describe('What a file says about itself', () => {
     assert.deepEqual([meta.width, meta.height, meta.category, meta.label], [390, 844, 'mobile', 'claro']);
     assert.deepEqual(meta.variants, [{ query: '?tema=escuro', label: 'escuro' }, { query: '?mode=empty', label: '' }]);
     assert.equal(meta.skip, undefined, 'only the <head> counts');
+  });
+
+  test('a variant changes the query, the size or both; its tag says it back the same way', () => {
+    const meta = parseDesignMeta(`<head>
+      <meta name="htmlboard:variant" content="width=390, height=844 · mobile">
+      <meta name="htmlboard:variant" content="?theme=dark width=390 · dark mobile">
+      <meta name="htmlboard:variant" content="height=600">
+      <meta name="htmlboard:variant" content="· nothing changes">
+    </head>`);
+    assert.deepEqual(meta.variants, [
+      { query: '', label: 'mobile', width: 390, height: 844 },
+      { query: '?theme=dark', label: 'dark mobile', width: 390 },
+      { query: '', label: '', height: 600 }
+    ]);
+    for (const variant of [...meta.variants, { query: '?tema=escuro', label: 'escuro' }, { query: '?a=1', label: '', width: 400, category: 'mobile' }]) {
+      const again = parseDesignMeta(`<head><meta name="htmlboard:variant" content="${formatVariant(variant)}"></head>`).variants[0];
+      assert.deepEqual(again, variant, formatVariant(variant));
+    }
   });
 
   test('skip, and values it ignores', () => {
@@ -71,6 +90,28 @@ describe('Designs from folders and files', () => {
     ]);
     // Ids leave the prefixes out, so reordering doesn't break links
     assert.deepEqual(manifest.sections[1].artboards.map((b) => b.id), ['screens-home', 'screens-home-theme-dark', 'screens-about']);
+  });
+
+  test('a page at more than one size: frames of the same file, each with its size, category and id', () => {
+    write('2-screens/03-landing.html', page([
+      '  <meta name="htmlboard" content="width=1280, category=desktop">',
+      '  <meta name="htmlboard:variant" content="width=390, height=844 · mobile">',
+      '  <meta name="htmlboard:variant" content="width=768 · tablet">',
+      '  <meta name="htmlboard:variant" content="?theme=dark width=390, height=844 · dark mobile">\n'
+    ].join('\n'), 'Landing'));
+    const landing = (manifest) => manifest.sections.flatMap((s) => s.artboards).filter((b) => b.file.startsWith('2-screens/03-landing'));
+    const boards = landing(loadDesignsManifest(dir));
+    assert.deepEqual(boards.map((b) => `${b.title} | ${b.file} | ${b.width}x${b.height ?? '-'} | ${b.category} | ${b.id}`), [
+      'Landing | 2-screens/03-landing.html | 1280x- | desktop | screens-landing',
+      'Landing · mobile | 2-screens/03-landing.html | 390x844 | mobile | screens-landing-mobile',
+      'Landing · tablet | 2-screens/03-landing.html | 768x- | tablet | screens-landing-tablet',
+      'Landing · dark mobile | 2-screens/03-landing.html?theme=dark | 390x844 | mobile | screens-landing-theme-dark-dark-mobile'
+    ]);
+    // Where designs.json puts the file, its sizes follow it
+    write('designs.json', JSON.stringify({ sections: [{ title: 'Web', designs: ['2-screens/03-landing.html'] }] }));
+    const curated = loadDesignsManifest(dir);
+    // (the folder's other designs join the section after them)
+    assert.deepEqual(curated.sections[0].artboards.slice(0, 4).map((b) => b.id), ['screens-landing', 'screens-landing-mobile', 'screens-landing-tablet', 'screens-landing-theme-dark-dark-mobile']);
   });
 
   test('designs.json curates: its sections first, its values on top, the rest after', () => {

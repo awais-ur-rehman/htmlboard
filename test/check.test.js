@@ -112,7 +112,7 @@ describe('htmlboard check', () => {
       assert.equal(report.dir, path.join(dir, 'designs'));
       // Every design on the canvas, components shown by designs.json too
       assert.deepEqual(report.designs.map((design) => design.file), ['home.html', '01-shop/01-cart.html', '01-shop/02-pay.html', 'components/x-tag.html?preview']);
-      assert.deepEqual(checks[0].designs[1], { file: '01-shop/01-cart.html', title: 'Cart', width: 390, height: 844 });
+      assert.deepEqual(checks[0].designs[1], { id: 'shop-cart', file: '01-shop/01-cart.html', title: 'Cart', width: 390, height: 844 });
       assert.equal(second.length, 1); // it heard of the check too, and lost the claim
 
       // A file or a folder of them

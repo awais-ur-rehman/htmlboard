@@ -65,7 +65,7 @@ Put what the designs share in one stylesheet instead of repeating it in every fi
 More tags, all optional:
 
 - `category=…` in the `htmlboard` tag files the design under the explorer's filters: `mobile`, `tablet`, `desktop`, `components` or your own word. Usually not needed: it comes from words in the path, then from the size when it is a screen's.
-- `<meta name="htmlboard:variant" content="?theme=dark · dark">` shows the same file again with that query string, named "<title> · dark". Use it for states the page builds from its URL (themes, empty or error states, data). Add one tag per variant; they follow the file.
+- `<meta name="htmlboard:variant" content="?theme=dark · dark">` shows the same file again with that query string, named "<title> · dark". Use it for states the page builds from its URL (themes, empty or error states, data). A variant can also change the size: `content="width=390, height=844 · mobile"` shows a responsive page at a phone's size too, from the same file (`?theme=dark width=390 · dark mobile` does both). Add one tag per variant; they follow the file.
 - `<meta name="htmlboard:label" content="light">` adds a label to the name of the file's own frame ("Checkout · light"), to tell it from its variants.
 - `<meta name="htmlboard" content="skip">` leaves a file out (partials, templates, a page that isn't a design).
 

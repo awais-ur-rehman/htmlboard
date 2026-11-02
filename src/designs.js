@@ -120,12 +120,36 @@ function parseSettings(content) {
   return settings;
 }
 
-/** <meta name="htmlboard:variant" content="?tema=escuro · escuro">: the query, then a label */
+// A variant's own setting, as the htmlboard tag says it: width=390, height=844, category=mobile
+const VARIANT_SETTING = /^(width|height|category)=[^,;\s]+[,;]?$/i;
+const LABEL_START = /^[·|:,\-–—]+\s*/;
+
+/**
+ * <meta name="htmlboard:variant" content="?tema=escuro · escuro">: the file once more, with a
+ * query string, a size (width=390, height=844) or both, then a label. A query may leave out its "?".
+ */
 function parseVariant(content) {
-  const [, first, rest] = content.match(/^(\S+)\s*(.*)$/s);
-  const query = first.startsWith('?') ? first : `?${first}`;
-  if (query === '?') return null;
-  return { query, label: rest.replace(/^[·|:,\-–—]+\s*/, '').trim() };
+  const tokens = content.trim().split(/\s+/);
+  let query = '';
+  const settings = [];
+  let i = 0;
+  for (; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (VARIANT_SETTING.test(token)) settings.push(token.replace(/[,;]$/, ''));
+    else if (token.startsWith('?') && !query) query = token;
+    else if (i === 0 && !LABEL_START.test(token)) query = `?${token}`;
+    else break;
+  }
+  if (query === '?') query = '';
+  const { width, height, category } = parseSettings(settings.join(','));
+  if (!query && !width && !height) return null;
+  return { query, label: tokens.slice(i).join(' ').replace(LABEL_START, '').trim(), ...compact({ width, height, category }) };
+}
+
+/** A variant as its tag's content says it: "?theme=dark width=390, height=844 · dark mobile" */
+export function formatVariant({ query = '', label = '', width, height, category }) {
+  const size = [width && `width=${width}`, height && `height=${height}`, category && `category=${category}`].filter(Boolean).join(', ');
+  return [query, size].filter(Boolean).join(' ') + (label ? ` · ${label}` : '');
 }
 
 /** What an HTML file says about itself, from its <head> (see the top of this file) */
@@ -196,12 +220,24 @@ function fileDesign(file, folder, meta) {
   });
 }
 
-function variantDesign(base, { query, label }) {
+// A variant of a file's design: another query string (a state the page builds from its URL), another
+// size (the same page at a phone's width), or both. Without a height of its own, a variant that
+// changes the width grows with its page. One that only changes the size loads the same URL as its
+// file, so its id comes from its label.
+function variantDesign(base, { query = '', label, width, height, category }) {
+  const sized = Boolean(width || height);
+  const size = sized ? { width: width ?? base.width, height: height ?? (width ? undefined : base.height) } : {};
+  const sizeName = sized ? `${size.width}${size.height ? ` × ${size.height}` : ''}` : '';
+  const name = label || [query.slice(1), sizeName].filter(Boolean).join(' · ');
   return compact({
     ...base,
-    key: base.file + query,
+    ...size,
+    key: base.file + query + (sized ? `@${size.width}x${size.height ?? ''}` : ''),
     file: base.file + query,
-    title: `${base.baseTitle} · ${label || query.slice(1)}`,
+    title: `${base.baseTitle} · ${name}`,
+    // A new size is a new device: its category comes from its size, unless it says one
+    category: sized ? category : category ?? base.category,
+    id: sized ? `${designId(base.file + query)}-${slugify(name)}` : undefined,
     variantOf: base.file
   });
 }
