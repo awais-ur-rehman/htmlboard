@@ -348,6 +348,9 @@ kbd {
 /* Designs the search leaves out stay in place, faded. */
 .frame.is-dimmed { opacity: 0.2; }
 
+/* Well off screen: not drawn (see paint in explorer.js) */
+.frame.is-away { content-visibility: hidden; }
+
 .overlay { position: absolute; inset: 0; overflow: hidden; overflow: clip; pointer-events: none; }
 
 .label, .section-title, .outline, .size { position: absolute; left: 0; top: 0; }

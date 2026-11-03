@@ -22,6 +22,7 @@ const DRAG_SLOP = 4;       // screen px a press can move and still be a click
 const DOUBLE_MS = 350;
 const CHANGE_MS = 60;      // saved files arriving this close together are applied at once
 const SETTLE_MS = 200;     // the canvas has stopped moving after this long still
+const AWAY_MARGIN = 0.25;  // of the screen's size: designs further off screen than this skip rendering
 const DEFAULT_SIZE = [1200, 800]; // a design whose entry gives no size; without a height it grows with its page
 const FIT_HEIGHT = 100;    // a frame that fits its page however short (a component's) starts this tall
 
@@ -482,7 +483,22 @@ function layout() {
 
 function paint() {
   const { x, y, z } = state.view;
+  const screen = size();
   els.world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+  // A design well off screen skips rendering: its page stays loaded, it just isn't drawn, so the
+  // designs on screen don't wait for the ones that aren't.
+  const mx = screen.w * AWAY_MARGIN;
+  const my = screen.h * AWAY_MARGIN;
+  for (const design of state.designs) {
+    if (!placed(design)) continue;
+    const left = x + design.x * z;
+    const top = y + design.y * z;
+    const away = left + design.w * z < -mx || left > screen.w + mx || top + design.h * z < -my || top > screen.h + my;
+    // Measured again on its way back: a page measured while it isn't drawn can come out a few px off
+    if (design.away && !away && design.autoHeight) requestAnimationFrame(() => growToPage(design));
+    design.away = away;
+    design.frame.classList.toggle('is-away', away);
+  }
   // Dots every 32 canvas px, doubled or halved to stay 16 to 64 screen px apart.
   let grid = 32 * z;
   while (grid < 16) grid *= 2;
