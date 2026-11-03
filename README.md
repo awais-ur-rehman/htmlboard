@@ -40,6 +40,7 @@ Modern AI agents and developers generate dozens of HTML mockups, layout variatio
 - 📱 **Device Filters**: **Mobile**, **Tablet** and **Desktop** (and **Components**, or your own categories) lay out just those designs, side by side, to compare them.
 - 🔎 **Search**: Find designs by name, file, tags or section (case and accents don't matter); the others fade out in place.
 - 👁️ **Sections You Can Fold and Hide**: Fold a section in the list, or hide it from the canvas: its designs unload, so a canvas of hundreds of designs stays light. <kbd>Alt</kbd> + click its eye to see only that one; the list remembers what you folded and hid.
+- 🖼️ **Light When Zoomed Out**: Below 25%, each design shows as a picture of its page, made in the background, and the page under it isn't drawn: hundreds of designs pan and zoom smoothly, and their animations don't keep your computer busy. Zoom in and they're live again.
 - 📸 **Copy or Save as an Image**: Hover a design for two buttons: copy it to the clipboard as a PNG of its full size (twice that on a Retina screen), or save it in a folder you choose once. <kbd>C</kbd> and <kbd>S</kbd> do the same for the selected design.
 - 🎯 **Focus & Zoom-to-Fit**: Click a design in the list or double-click it on the canvas to fit it, <kbd>Shift</kbd> + <kbd>1</kbd> fits everything, <kbd>←</kbd> <kbd>→</kbd> step through the designs.
 - 🔗 **Deep Links**: The URL follows the selected design (`http://localhost:3000/#checkout-b`), so you can share or reload a view of one design.
@@ -377,7 +378,9 @@ It writes each file's size, category, label, variants and description as tags af
 | <kbd>?</kbd> | Show the shortcuts |
 | <kbd>Esc</kbd> | Deselect, then clear the search, then the filter |
 
-On the canvas the designs are pictures: the canvas takes every click and scroll, so <kbd>Ctrl</kbd> + scroll never zooms the page itself. Use **Open** (or <kbd>Enter</kbd>) to try a design's links and hover states on its own.
+On the canvas the designs don't take clicks: the canvas takes every click and scroll, so <kbd>Ctrl</kbd> + scroll never zooms the page itself. Use **Open** (or <kbd>Enter</kbd>) to try a design's links and hover states on its own.
+
+**Zoomed out, pictures.** Below 25% zoom, each design shows a picture of its page instead of the page itself, so a canvas of hundreds of designs stays light: its animations stop, and nothing is drawn again until the view changes. The pictures are made in the background, a few at a time, nearest the middle of the screen first, once a page has loaded and built itself; until then, and while a saved design's picture is made again, its page shows as before. Zoom in past 25% and the designs come back to life once the canvas stops. A picture has the limits of an image of a design (below).
 
 **Images of a design.** Hovering a design shows two buttons over its top right corner. **Copy** puts it in the clipboard as a PNG, to paste anywhere; **Save** writes it in a folder you pick the first time (the canvas remembers it for the project, <kbd>Shift</kbd> + click picks another), as `<design id>.png`, then `-2`, `-3`… so it never replaces an image. Browsers without folder access (Firefox, Safari) download it instead. Your browser draws the image from the page as its frame shows it, with its stylesheets, fonts and images, at the frame's size and your screen's pixel density. A few things can't be in it: images from other sites that don't allow it, pages inside the page (iframes), and shadow DOM.
 
@@ -473,7 +476,7 @@ htmlboard/
 │   │   ├── explorer.css  # Dark chrome, dot grid
 │   │   ├── explorer.js   # Layout, pan/zoom, search, live reload
 │   │   ├── check.js      # Checks the designs in frames out of sight, for `htmlboard check`
-│   │   ├── picture.js    # A design as an image, drawn by the browser (copy, save)
+│   │   ├── picture.js    # A design as an image, drawn by the browser (copy, save, zoomed out)
 │   │   ├── probe.js      # Notes script errors and failed loads in the frames the check loads
 │   │   ├── favicon.svg, logo.svg, mark.svg
 │   │   └── fonts/        # Inter and Bricolage Grotesque (OFL)

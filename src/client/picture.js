@@ -15,6 +15,17 @@ const IMPORT_RULE = 3;
 const FONT_FACE_RULE = 5;
 const LEFT_OUT = new Set(['script', 'noscript', 'style', 'link', 'source', 'track']);
 
+// What pictures of several designs share, read once for all of them: the files (fonts, images) as
+// data: URLs, and each linked stylesheet's CSS, for each set of its fonts the designs use. Kept until
+// forgetFiles(): after a file changes, or once every picture is made.
+const shared = { files: new Map(), sheets: new Map(), svgs: new Map() };
+
+export function forgetFiles() {
+  shared.files.clear();
+  shared.sheets.clear();
+  shared.svgs.clear();
+}
+
 /**
  * The page in `iframe` drawn on a canvas, `width` × `height` CSS px at `scale` device px per CSS px
  * (less when that would make a canvas too big to draw).
@@ -48,6 +59,7 @@ export async function drawDesign(iframe, { width, height, scale = 1 }) {
   context.fillStyle = backdrop(doc, win);
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.src = ''; // the copy of the page it holds can go now, not when memory runs short
   return canvas;
 }
 
@@ -82,8 +94,7 @@ function reader(win) {
   } catch {
     // Can't tell
   }
-  const read = new Map();
-  const svgs = new Map();
+  const read = shared.files;
   return {
     used,
     // '' when it can't be read: missing, or another site's that doesn't allow it
@@ -98,8 +109,8 @@ function reader(win) {
     },
     // An SVG file, parsed (a sprite of icons that <use> draws from); null when it can't be read
     svg(url) {
-      if (!svgs.has(url)) {
-        svgs.set(url, fetch(url)
+      if (!shared.svgs.has(url)) {
+        shared.svgs.set(url, fetch(url)
           .then((res) => (res.ok ? res.text() : ''))
           .then((text) => {
             const parsed = text && new DOMParser().parseFromString(text, 'image/svg+xml');
@@ -107,7 +118,7 @@ function reader(win) {
           })
           .catch(() => null));
       }
-      return svgs.get(url);
+      return shared.svgs.get(url);
     },
   };
 }
@@ -152,45 +163,79 @@ async function inlineUrls(css, base, files) {
 /** All the CSS the page has, in its order, with the files it uses inlined */
 async function styles(doc, files) {
   const parts = [];
-  for (const sheet of doc.styleSheets) if (!sheet.disabled) parts.push(await sheetCss(sheet, doc.baseURI, files));
-  for (const sheet of doc.adoptedStyleSheets || []) parts.push(await rulesCss(sheet.cssRules, doc.baseURI, files));
+  for (const sheet of doc.styleSheets) if (!sheet.disabled) parts.push(await sheetCss(sheet, doc.baseURI, files, []));
+  for (const sheet of doc.adoptedStyleSheets || []) parts.push(await rulesCss(sheet.cssRules, doc.baseURI, files, []));
   return parts.join('\n');
 }
 
-async function sheetCss(sheet, base, files, media = sheet.media?.mediaText) {
-  const href = sheet.href || base;
+// `fonts` collects the files of the font faces read, to tell which of them a page used.
+async function sheetCss(sheet, base, files, fonts, media = sheet.media?.mediaText) {
   let css;
-  try {
-    css = await rulesCss(sheet.cssRules, href, files);
-  } catch {
-    // Another site's stylesheet, which the page can use but not read: fetched again, as most allow
-    // (font services and CDNs do).
-    css = sheet.href ? await fetch(sheet.href).then((res) => (res.ok ? res.text() : '')).catch(() => '') : '';
-    css = await inlineUrls(css, href, files);
+  if (sheet.href) {
+    // A linked stylesheet, often the same in every design: read once for each set of its fonts used
+    const saved = shared.sheets.get(sheet.href);
+    const key = saved && fontsKey(saved.fonts, files.used);
+    if (saved?.css.has(key)) {
+      css = saved.css.get(key);
+      fonts.push(...saved.fonts);
+    } else {
+      const own = [];
+      css = await readSheet(sheet, sheet.href, files, own);
+      fonts.push(...own);
+      const entry = saved || { fonts: own, css: new Map() };
+      entry.css.set(fontsKey(entry.fonts, files.used), css);
+      shared.sheets.set(sheet.href, entry);
+    }
+  } else {
+    css = await readSheet(sheet, base, files, fonts);
   }
   return media && media !== 'all' ? `@media ${media} {\n${css}\n}` : css;
 }
 
-async function rulesCss(rules, base, files) {
+async function readSheet(sheet, base, files, fonts) {
+  try {
+    return await rulesCss(sheet.cssRules, base, files, fonts);
+  } catch {
+    // Another site's stylesheet, which the page can use but not read: fetched again, as most allow
+    // (font services and CDNs do).
+    const css = sheet.href ? await fetch(sheet.href).then((res) => (res.ok ? res.text() : '')).catch(() => '') : '';
+    return inlineUrls(css, base, files);
+  }
+}
+
+async function rulesCss(rules, base, files, fonts) {
   const parts = [];
   for (const rule of rules) {
     if (rule.type === IMPORT_RULE) {
-      let css = rule.styleSheet ? await sheetCss(rule.styleSheet, base, files, rule.media?.mediaText) : '';
+      let css = rule.styleSheet ? await sheetCss(rule.styleSheet, base, files, fonts, rule.media?.mediaText) : '';
       if (rule.supportsText) css = `@supports ${rule.supportsText} {\n${css}\n}`;
       if (rule.layerName != null) css = `@layer${rule.layerName ? ` ${rule.layerName}` : ''} {\n${css}\n}`;
       parts.push(css);
-    } else if (rule.type !== FONT_FACE_RULE || !unusedFont(rule, base, files.used)) {
+    } else if (rule.type === FONT_FACE_RULE) {
+      const urls = fontFiles(rule, base);
+      fonts.push(...urls);
+      if (!unusedFont(urls, files.used)) parts.push(rule.cssText);
+    } else {
       parts.push(rule.cssText);
     }
   }
   return inlineUrls(parts.join('\n'), base, files);
 }
 
+// The files a font face loads from (not the ones inside it, as data: URLs)
+function fontFiles(rule, base) {
+  return [...rule.cssText.matchAll(URL_RE)].map((match) => match[2].trim())
+    .filter((url) => !/^data:/i.test(url)).map((url) => absolute(url, base)).filter(Boolean);
+}
+
 // A font face whose files the page never loaded
-function unusedFont(rule, base, used) {
-  if (!used) return false;
-  const urls = [...rule.cssText.matchAll(URL_RE)].map((match) => match[2].trim()).filter((url) => !/^data:/i.test(url));
-  return urls.length > 0 && !urls.some((url) => used.has(absolute(url, base)));
+function unusedFont(urls, used) {
+  return Boolean(used) && urls.length > 0 && !urls.some((url) => used.has(url));
+}
+
+// Which of a stylesheet's fonts a page loaded: pages that loaded the same ones get the same CSS
+function fontsKey(fonts, used) {
+  return used ? fonts.filter((url) => used.has(url)).join(' ') : '*';
 }
 
 // ---------------------------------------------------------------- the page's HTML
