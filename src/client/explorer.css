@@ -329,6 +329,7 @@ kbd {
 .viewport.is-space { cursor: grab; }
 
 .world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.world.is-moving { will-change: transform; } /* see setView in explorer.js */
 
 .frame {
   position: absolute;

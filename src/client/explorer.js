@@ -20,6 +20,7 @@ const TOOLBAR_SPACE = 64;  // screen px kept clear at the bottom for the toolbar
 const DRAG_SLOP = 4;       // screen px a press can move and still be a click
 const DOUBLE_MS = 350;
 const CHANGE_MS = 60;      // saved files arriving this close together are applied at once
+const SETTLE_MS = 200;     // the canvas has stopped moving after this long still
 const DEFAULT_SIZE = [1200, 800]; // a design whose entry gives no size; without a height it grows with its page
 const FIT_HEIGHT = 100;    // a frame that fits its page however short (a component's) starts this tall
 
@@ -550,8 +551,15 @@ function saveView() {
 
 // ---------------------------------------------------------------- moving the canvas
 
+// While the canvas moves, it is one layer the browser slides and scales without drawing every design
+// again on each frame; once it stops, they are drawn again, sharp, at the new zoom. (Kept as a layer
+// for good, it would hold more memory, and some browsers would leave it blurry after a zoom.)
+let settleTimer = 0;
 function setView(view) {
   state.view = view;
+  els.world.classList.add('is-moving');
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => els.world.classList.remove('is-moving'), SETTLE_MS);
   paint();
 }
 
