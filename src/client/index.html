@@ -29,9 +29,28 @@
         <kbd aria-hidden="true">/</kbd>
       </div>
       <div class="filters" id="filters" role="group" aria-label="Show" hidden></div>
+      <div class="sections-bar" id="sections-bar" hidden>
+        <span class="sections-label">Sections</span>
+        <div class="sections-tools" role="group" aria-label="All sections">
+          <button class="mini" type="button" id="expand-all" title="Expand all" aria-label="Expand all sections">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>
+          </button>
+          <button class="mini" type="button" id="collapse-all" title="Collapse all" aria-label="Collapse all sections">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg>
+          </button>
+          <span class="mini-gap" aria-hidden="true"></span>
+          <button class="mini" type="button" id="show-all" title="Show all on the canvas" aria-label="Show all sections">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="mini" type="button" id="hide-all" title="Hide all from the canvas" aria-label="Hide all sections">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08a10.74 10.74 0 0 1 11.2 6.57 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-1.44 2.49M14.08 14.16a3 3 0 0 1-4.24-4.24M17.48 17.5a10.75 10.75 0 0 1-15.42-5.15 1 1 0 0 1 0-.7 10.75 10.75 0 0 1 4.45-5.14M2 2l20 20"/></svg>
+          </button>
+        </div>
+      </div>
       <p class="no-match" id="no-match" hidden>No design matches the search.</p>
       <nav class="list" id="list" aria-label="Designs by section"></nav>
       <p class="sidebar-hint">Drag or scroll to move, <kbd>Ctrl</kbd> + scroll or pinch to zoom, double-click a design to fit it. <kbd>?</kbd> lists the shortcuts.</p>
+
     </aside>
 
     <main class="viewport" id="viewport" aria-label="Canvas">
@@ -90,6 +109,11 @@
           <div><dt><kbd>Esc</kbd></dt><dd>Deselect</dd></div>
         </dl>
       </section>
+
+      <div class="empty" id="empty" hidden>
+        <p id="empty-text">All sections are hidden.</p>
+        <button class="empty-show" type="button" id="empty-show">Show all</button>
+      </div>
 
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
       <div class="notice" id="notice" hidden>

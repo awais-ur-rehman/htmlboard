@@ -39,6 +39,7 @@ Modern AI agents and developers generate dozens of HTML mockups, layout variatio
 - 📐 **Optional `designs.json`**: Curates when you want it (section titles, order, overrides); designs it doesn't list still show at the end, or don't (`"unlisted": "hide"`). `htmlboard migrate` moves an existing one into the files.
 - 📱 **Device Filters**: **Mobile**, **Tablet** and **Desktop** (and **Components**, or your own categories) lay out just those designs, side by side, to compare them.
 - 🔎 **Search**: Find designs by name, file, tags or section (case and accents don't matter); the others fade out in place.
+- 👁️ **Sections You Can Fold and Hide**: Fold a section in the list, or hide it from the canvas: its designs unload, so a canvas of hundreds of designs stays light. <kbd>Alt</kbd> + click its eye to see only that one; the list remembers what you folded and hid.
 - 🎯 **Focus & Zoom-to-Fit**: Click a design in the list or double-click it on the canvas to fit it, <kbd>Shift</kbd> + <kbd>1</kbd> fits everything, <kbd>←</kbd> <kbd>→</kbd> step through the designs.
 - 🔗 **Deep Links**: The URL follows the selected design (`http://localhost:3000/#checkout-b`), so you can share or reload a view of one design.
 - ⌨️ **Keyboard-First Workflow**: Figma-like shortcuts; <kbd>?</kbd> lists them.
@@ -240,7 +241,8 @@ Checked 6 designs in designs (the canvas at http://localhost:3000): 2 with probl
 
 Every `.html` file under the folder is a design (hidden folders, `node_modules`, `dist`, `build` and the [components](#-components) in `components/` aside):
 
-- **Sections are folders.** Each folder is a row on the canvas, named after the folder; the files at the top of the folder make a first row without a title.
+- **Sections are folders.** Each folder is a row on the canvas, named after the folder; the files at the top of the folder make a first row without a title ("Top level" in the list).
+- **In the list, a section folds** under its title, and **its eye hides it from the canvas**: its designs unload and the rows below move up, which keeps a canvas of many designs light. <kbd>Alt</kbd> + click an eye shows only that section (again: all of them); the buttons above the sections fold, unfold, show or hide them all. A hidden section's designs stay in the list, faded, and the search still finds them: clicking one (or a link to it) shows its section. The list remembers what you folded and hid, for each project.
 - **Number prefixes set the order** of files and folders: `01-…`, `02-…`, `10-…` (up to three digits; `2` comes before `10`). They don't show in names or in links, so reordering breaks nothing.
 - **A file describes itself** in its `<head>`:
 

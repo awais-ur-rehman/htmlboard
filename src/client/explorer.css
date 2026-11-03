@@ -158,6 +158,49 @@ kbd {
 
 .search input:focus ~ kbd, .search input:not(:placeholder-shown) ~ kbd { display: none; }
 
+/* All the sections at once: unfold or fold them in the list, show or hide them on the canvas */
+.sections-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 12px 0;
+  padding: 6px 0 0 4px;
+  border-top: 1px solid var(--x-line-soft);
+}
+
+.sections-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--x-text-faint); }
+.sections-tools { display: flex; align-items: center; gap: 2px; }
+.mini-gap { width: 6px; }
+
+/* A small icon button: the sections bar, a section's eye */
+.mini {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--x-text-soft);
+  cursor: pointer;
+}
+
+.mini:hover:not(:disabled) { background: var(--x-wash); color: var(--x-text); }
+.mini:disabled { opacity: 0.35; cursor: default; }
+
+.mini svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .list { flex: 1; overflow-y: auto; padding: 0 8px 16px; scrollbar-width: thin; scrollbar-color: var(--x-line) transparent; }
 
 .list h2 {
@@ -173,6 +216,67 @@ kbd {
 
 .list ul { margin: 0; padding: 0; list-style: none; }
 .list section > ul:first-child { margin-top: 12px; } /* a section without a title (the files at the top) */
+
+/* A section of several: its title (and arrow) folds it, its eye hides it from the canvas. The eye
+   shows on hover, and stays while the section is hidden. */
+.group-head { display: flex; align-items: center; gap: 2px; margin: 12px 0 2px; border-radius: 5px; }
+.group-head:hover { background: var(--x-wash); }
+
+.group-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 6px 4px 2px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--x-text-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-toggle svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--x-text-faint);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.12s;
+}
+
+.group-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.group-count { order: 1; flex: none; margin-left: auto; padding-left: 8px; font-size: 12px; color: var(--x-text-faint); font-variant-numeric: tabular-nums; }
+.group-eye { visibility: hidden; }
+.group-head:hover .group-eye, .group-eye:focus-visible, .group.is-hidden .group-eye { visibility: visible; }
+
+.group.is-folded .group-toggle svg { transform: rotate(-90deg); }
+.group.is-folded > ul, .group.is-folded > .section-desc { display: none; }
+.group-head ~ ul .item { padding-left: 20px; }
+.list .group-head ~ .section-desc { margin-left: 20px; }
+
+.group.is-hidden .group-name, .group.is-hidden .group-count, .group.is-hidden .item { opacity: 0.45; }
+.group.is-hidden .item:hover { opacity: 0.8; }
+
+/* A folded section holding the selected design says so */
+.group.has-selection .group-name { color: var(--x-accent-text); }
+.group.has-selection .group-toggle::after { content: ''; flex: none; width: 6px; height: 6px; margin-left: 3px; border-radius: 50%; background: var(--x-accent); }
 
 .item {
   display: flex;
@@ -375,6 +479,36 @@ kbd {
 
 .toast.is-on { opacity: 1; }
 
+/* The canvas with nothing left to show (every section hidden), and the way back */
+.empty {
+  position: absolute;
+  inset: 0 0 64px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--x-text-soft);
+  pointer-events: none;
+}
+
+.empty p { margin: 0; }
+
+.empty-show {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--x-line);
+  border-radius: 15px;
+  background: var(--x-raised);
+  color: var(--x-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.empty-show:hover { border-color: transparent; background: var(--x-accent-wash); color: var(--x-accent-text); }
+
 .notice {
   position: absolute;
   inset: 0;
@@ -403,5 +537,5 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast { transition: none; }
+  .toast, .group-toggle svg { transition: none; }
 }

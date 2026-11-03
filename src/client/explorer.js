@@ -30,14 +30,17 @@ const els = {
   hover: $('hover'), selection: $('selection'), size: $('size'), zoom: $('zoom-reset'), open: $('open'),
   live: $('live'), help: $('help'), helpToggle: $('help-toggle'), toggleList: $('toggle-list'),
   toast: $('toast'), notice: $('notice'), noticeTitle: $('notice-title'), noticeText: $('notice-text'),
-  version: $('version'),
+  version: $('version'), sectionsBar: $('sections-bar'), expandAll: $('expand-all'), collapseAll: $('collapse-all'),
+  showAll: $('show-all'), hideAll: $('hide-all'), empty: $('empty'), emptyText: $('empty-text'),
 };
 
 const state = {
   manifest: '',         // /api/designs as last read, to tell a real change
   autoDiscovered: false, // no designs.json: every HTML file is a design
-  sections: [],         // { name, designs, el, group, x, y, w, h }
-  designs: [],          // { id, file, path, title, search, w, h, autoHeight, x, y, frame, iframe, label, item, … }
+  // { id, name, designs, el, group, head, x, y, w, h, hidden, collapsed, searchCollapsed }
+  sections: [],
+  grouped: false,       // more than one section: each can be folded in the list and hidden from the canvas
+  designs: [],          // { id, file, path, title, search, section, w, h, autoHeight, x, y, frame, iframe, label, item, … }
   view: { x: 0, y: 0, z: 1 },
   selected: null,
   hover: null,
@@ -81,6 +84,12 @@ function el(tag, className, text) {
 
 const urlOf = (file) => encodeURI(`/${file}`);
 
+const ICONS = {
+  chevron: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.73 5.08a10.74 10.74 0 0 1 11.2 6.57 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-1.44 2.49"/><path d="M14.08 14.16a3 3 0 0 1-4.24-4.24"/><path d="M17.48 17.5a10.75 10.75 0 0 1-15.42-5.15 1 1 0 0 1 0-.7 10.75 10.75 0 0 1 4.45-5.14"/><path d="m2 2 20 20"/></svg>',
+};
+
 // ---------------------------------------------------------------- loading
 
 async function fetchManifest() {
@@ -102,13 +111,25 @@ function build(manifest) {
   const title = manifest.title || 'Designs';
   els.title.textContent = title;
   document.title = `${title} · htmlboard`;
-  for (const entry of manifest.sections || []) {
+  const entries = manifest.sections || [];
+  // With one section there is nothing to choose between: it shows as before, and can't be hidden.
+  state.grouped = entries.length > 1;
+  const hidden = new Set(state.grouped ? readStore('hidden') || [] : []);
+  const collapsed = new Set(state.grouped ? readStore('collapsed') || [] : []);
+  const ids = new Set();
+  entries.forEach((entry, i) => {
     const name = entry.name || '';
-    const section = { name, designs: [], el: el('div', 'section-title', name), group: el('section') };
+    let id = String(entry.id || name || `section-${i + 1}`);
+    for (let n = 2; ids.has(id); n++) id = `${entry.id || name || `section-${i + 1}`}-${n}`;
+    ids.add(id);
+    const section = {
+      id, name, designs: [], el: el('div', 'section-title', name), group: el('section', 'group'),
+      hidden: hidden.has(id), collapsed: collapsed.has(id), searchCollapsed: false,
+    };
     els.overlay.insertBefore(section.el, els.hover);
     const items = el('ul');
-    // The files at the top of the folder make a first section without a title
-    if (name) section.group.append(el('h2', null, name));
+    if (state.grouped) section.group.append(sectionHead(section));
+    else if (name) section.group.append(el('h2', null, name)); // the files at the top of the folder have no title
     if (entry.description) section.group.append(el('p', 'section-desc', entry.description));
     section.group.append(items);
     for (const board of entry.artboards || []) {
@@ -119,7 +140,9 @@ function build(manifest) {
     }
     els.list.append(section.group);
     state.sections.push(section);
-  }
+  });
+  els.sectionsBar.hidden = !state.grouped;
+  placeFrames();
   if (!state.designs.length) {
     showNotice(
       'No designs yet',
@@ -140,6 +163,7 @@ function makeDesign(board, section) {
   const design = {
     id: String(board.id || file),
     category: board.category || '',
+    section,
     file,
     path: `/${file.split('?')[0]}`,
     title: board.title || file,
@@ -158,9 +182,8 @@ function makeDesign(board, section) {
   design.iframe.tabIndex = -1;
   design.iframe.setAttribute('scrolling', 'no');
   design.iframe.addEventListener('load', () => onLoad(design));
-  design.iframe.src = urlOf(file);
+  design.iframe.src = urlOf(file); // loads once placeFrames puts it on the canvas
   design.frame.append(design.iframe);
-  els.world.append(design.frame);
 
   design.label = el('div', 'label', design.title);
   els.overlay.insertBefore(design.label, els.hover);
@@ -172,6 +195,8 @@ function makeDesign(board, section) {
   design.item.append(el('span', 'name', design.title), design.itemDims);
   design.item.addEventListener('click', () => {
     state.autoFit = null;
+    // A design of a hidden section shows its section
+    if (section.hidden) setHidden((s) => s.hidden && s !== section, { reveal: false });
     select(design, { fit: true });
   });
   design.li = el('li');
@@ -223,13 +248,18 @@ function inFilter(design) {
   return !state.category || design.category === state.category;
 }
 
+// On the canvas: in a shown section, and kept by the filter.
+function placed(design) {
+  return !design.section.hidden && inFilter(design);
+}
+
 function matches(design) {
   return state.query.every((word) => design.search.includes(word));
 }
 
-// The designs the filter and the search keep.
+// The designs on the canvas the search keeps.
 function shown() {
-  return state.designs.filter((d) => inFilter(d) && matches(d));
+  return state.designs.filter((d) => placed(d) && matches(d));
 }
 
 function buildFilters() {
@@ -267,10 +297,12 @@ function setCategory(category, { fitAll = true } = {}) {
   if (fitAll) fit('all');
 }
 
+// The list shows what the filter and the search keep, hidden sections' designs too (faded), so they
+// can be found and shown again. The count is of the designs on the canvas.
 function applySearch() {
   let count = 0;
   for (const section of state.sections) {
-    let any = false;
+    let listed = 0;
     for (const design of section.designs) {
       const kept = inFilter(design);
       const on = kept && matches(design);
@@ -278,21 +310,145 @@ function applySearch() {
       design.frame.classList.toggle('is-dimmed', kept && !on);
       design.label.classList.toggle('is-dimmed', kept && !on);
       if (on) {
-        any = true;
-        count++;
+        listed++;
+        if (!section.hidden) count++;
       }
     }
-    section.group.hidden = !any;
+    section.group.hidden = !listed;
+    if (section.tally) section.tally.textContent = String(listed);
   }
   const total = state.designs.length;
-  const narrowed = state.query.length || state.category;
+  const searched = state.query.length || state.category;
+  const narrowed = searched || state.sections.some((s) => s.hidden);
   els.count.textContent = narrowed ? `${count} of ${total}` : String(total);
-  els.noMatch.hidden = !narrowed || count > 0;
+  els.noMatch.hidden = !searched || state.designs.some((d) => !d.li.hidden);
+  paintSections();
 }
 
 function search(text) {
+  const searching = state.query.length > 0;
   state.query = fold(text).split(/\s+/).filter(Boolean);
+  // A new search opens the folded sections, to show what it finds
+  if (!searching && state.query.length) for (const section of state.sections) section.searchCollapsed = false;
   applySearch();
+}
+
+// ---------------------------------------------------------------- sections: folded in the list, hidden from the canvas
+
+// A section's row in the list: the arrow (or the title) folds it, the eye hides it from the canvas.
+function sectionHead(section) {
+  const head = el('div', 'group-head');
+  const toggle = el('button', 'group-toggle');
+  toggle.type = 'button';
+  toggle.innerHTML = ICONS.chevron;
+  section.tally = el('span', 'group-count');
+  toggle.append(el('span', 'group-name', section.name || 'Top level'), section.tally);
+  toggle.addEventListener('click', () => setCollapsed((s) => (s === section ? !isCollapsed(s) : isCollapsed(s))));
+  const eye = el('button', 'mini group-eye');
+  eye.type = 'button';
+  eye.addEventListener('click', (event) => {
+    if (event.altKey) {
+      // Only this section on the canvas; again, all of them
+      const alone = !section.hidden && state.sections.every((s) => s === section || s.hidden);
+      setHidden((s) => !alone && s !== section);
+    } else {
+      setHidden((s) => (s === section ? !s.hidden : s.hidden));
+    }
+  });
+  head.append(toggle, eye);
+  Object.assign(section, { head, toggle, eye });
+  return head;
+}
+
+// While searching, sections open to show what the search finds, and folding one lasts until the
+// search is cleared; otherwise it is remembered.
+function isCollapsed(section) {
+  return state.query.length ? section.searchCollapsed : section.collapsed;
+}
+
+// Folds and unfolds sections in the list: fn(section) says which are folded.
+function setCollapsed(fn) {
+  const searching = state.query.length > 0;
+  for (const section of state.sections) {
+    if (searching) section.searchCollapsed = Boolean(fn(section));
+    else section.collapsed = Boolean(fn(section));
+  }
+  saveSections();
+  paintSections();
+}
+
+// Hides and shows sections on the canvas: fn(section) says which are hidden. A hidden section's
+// designs leave the canvas and their pages unload, so a canvas of many designs stays light; the
+// rows below move up. `reveal`: bring the canvas into view when what's left is out of it.
+function setHidden(fn, { reveal = true } = {}) {
+  let changed = false;
+  for (const section of state.sections) {
+    const hidden = Boolean(fn(section));
+    if (section.hidden !== hidden) {
+      section.hidden = hidden;
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  placeFrames();
+  if (state.selected && !placed(state.selected)) select(null);
+  if (state.hover && !placed(state.hover)) state.hover = null;
+  state.autoFit = null;
+  saveSections();
+  applySearch();
+  layout();
+  if (reveal && state.designs.some(placed) && !inSight()) fit('all');
+}
+
+// The frames of the shown sections are on the canvas. Taken off it, a frame's page unloads; put
+// back, it loads again.
+function placeFrames() {
+  for (const design of state.designs) {
+    if (design.section.hidden) design.frame.remove();
+    else if (!design.frame.isConnected) els.world.append(design.frame);
+  }
+}
+
+function saveSections() {
+  if (!state.grouped) return;
+  writeStore('hidden', state.sections.filter((s) => s.hidden).map((s) => s.id));
+  writeStore('collapsed', state.sections.filter((s) => s.collapsed).map((s) => s.id));
+}
+
+// Whether any design on the canvas is on screen.
+function inSight() {
+  const { x, y, z } = state.view;
+  const screen = size();
+  return state.designs.some((d) => placed(d)
+    && x + (d.x + d.w) * z > 0 && x + d.x * z < screen.w && y + (d.y + d.h) * z > 0 && y + d.y * z < screen.h);
+}
+
+// The sections in the list as they are (folded, hidden, holding the selection), the buttons for all
+// of them, and the canvas's word when it has nothing left to show.
+function paintSections() {
+  for (const section of state.sections) {
+    const folded = state.grouped && isCollapsed(section);
+    section.group.classList.toggle('is-folded', folded);
+    section.group.classList.toggle('is-hidden', section.hidden);
+    section.group.classList.toggle('has-selection', folded && state.selected?.section === section);
+    if (!section.head) continue;
+    section.toggle.setAttribute('aria-expanded', String(!folded));
+    if (section.eyeShows !== section.hidden) {
+      section.eyeShows = section.hidden;
+      section.eye.innerHTML = section.hidden ? ICONS.eyeOff : ICONS.eye;
+      section.eye.title = `${section.hidden ? 'Show on the canvas' : 'Hide from the canvas'} (Alt + click: only this section)`;
+      section.eye.setAttribute('aria-label', `${section.hidden ? 'Show' : 'Hide'} ${section.name || 'Top level'}`);
+    }
+  }
+  const listed = state.sections.filter((s) => !s.group.hidden);
+  els.expandAll.disabled = !listed.some(isCollapsed);
+  els.collapseAll.disabled = listed.every(isCollapsed);
+  els.showAll.disabled = !state.sections.some((s) => s.hidden);
+  els.hideAll.disabled = state.sections.every((s) => s.hidden);
+  els.empty.hidden = !state.designs.length || state.designs.some(placed);
+  els.emptyText.textContent = state.sections.every((s) => s.hidden)
+    ? 'All sections are hidden.'
+    : 'This filter’s designs are all in hidden sections.';
 }
 
 // ---------------------------------------------------------------- layout and drawing
@@ -305,14 +461,14 @@ function layout() {
     let height = 0;
     for (const design of section.designs) {
       design.frame.hidden = !inFilter(design);
-      if (design.frame.hidden) continue;
+      if (!placed(design)) continue;
       design.x = x;
       design.y = y;
       Object.assign(design.frame.style, { left: `${x}px`, top: `${y}px`, width: `${design.w}px`, height: `${design.h}px` });
       x += design.w + FRAME_GAP;
       height = Math.max(height, design.h);
     }
-    // A section the filter empties takes no room
+    // A section the filter empties, or a hidden one, takes no room
     Object.assign(section, { x: 0, y, w: Math.max(0, x - FRAME_GAP), h: height, shown: x > 0 });
     if (section.shown) y += height + SECTION_GAP;
   }
@@ -345,7 +501,7 @@ function paint() {
     section.el.hidden = room < 30 || !section.name;
     section.el.style.transform = `translate(${Math.round(x + section.x * z)}px, ${top - (named ? 54 : 30)}px)`;
     for (const design of section.designs) {
-      if (design.frame.hidden) {
+      if (!placed(design)) {
         design.label.hidden = true;
         continue;
       }
@@ -428,8 +584,13 @@ function viewFor(rect, top) {
 // target: 'all' (what the search keeps) or a design.
 function fit(target, { animate = true } = {}) {
   if (target === 'all') {
-    const designs = shown();
-    moveTo(viewFor(boundsOf(designs.length ? designs : state.designs.filter(inFilter)), TITLE_SPACE), animate);
+    const found = shown();
+    const designs = found.length ? found : state.designs.filter(placed);
+    if (!designs.length) {
+      paint(); // every section hidden: nothing to fit
+      return;
+    }
+    moveTo(viewFor(boundsOf(designs), TITLE_SPACE), animate);
   } else {
     moveTo(viewFor(target, NAME_SPACE), animate);
   }
@@ -500,7 +661,11 @@ function select(design, { fit: fitIt = false, animate = true } = {}) {
   els.open.setAttribute('aria-disabled', String(!state.selected));
   const hash = state.selected ? `#${encodeURIComponent(state.selected.id)}` : '';
   if (location.hash !== hash) history.replaceState(null, '', hash || location.pathname + location.search);
-  if (state.selected && !state.selected.li.hidden) state.selected.item.scrollIntoView({ block: 'nearest' });
+  paintSections(); // a folded section marks the selection it holds
+  if (state.selected && !state.selected.li.hidden) {
+    const { section } = state.selected;
+    (state.grouped && isCollapsed(section) ? section.head : state.selected.item).scrollIntoView({ block: 'nearest' });
+  }
   if (state.selected && fitIt) fit(state.selected, { animate });
   else paintMarks();
 }
@@ -537,7 +702,7 @@ function hit(point) {
   const cy = (point.y - y) / z;
   for (let i = state.designs.length - 1; i >= 0; i--) {
     const d = state.designs[i];
-    if (d.frame.hidden) continue;
+    if (!placed(d)) continue;
     const top = d.y - (d.label.hidden ? 0 : NAME_SPACE / z);
     if (cx >= d.x && cx <= d.x + d.w && cy >= top && cy <= d.y + d.h) return d;
   }
@@ -618,7 +783,8 @@ function uses(design, path) {
 function rebuild(manifest) {
   const selected = state.selected?.id;
   build(manifest);
-  select(state.designs.find((d) => d.id === selected) || null);
+  const design = state.designs.find((d) => d.id === selected);
+  select(design && placed(design) ? design : null);
 }
 
 // What a new canvas changed, from the designs before and after it.
@@ -700,7 +866,7 @@ async function reloadAll() {
     return;
   }
   if (JSON.stringify(manifest) !== state.manifest) rebuild(manifest);
-  else state.designs.forEach(reloadFrame);
+  else state.designs.filter((d) => d.frame.isConnected).forEach(reloadFrame);
   toast('Designs reloaded');
 }
 
@@ -736,8 +902,9 @@ async function applyChanges() {
     if (await rebuildIfChanged() === 'rebuilt') return;
   }
 
+  // A hidden section's designs aren't loaded: they load as they are now when it is shown.
   const paths = files.map((file) => `/${file}`);
-  const frames = state.designs.filter((d) => paths.includes(d.path) || paths.some((path) => uses(d, path)));
+  const frames = state.designs.filter((d) => d.frame.isConnected && (paths.includes(d.path) || paths.some((path) => uses(d, path))));
   if (!frames.length) return;
   // Name the shared files the designs use (a stylesheet, a script), not whatever else was saved.
   // Asked before reloading: a reloading page forgets what it loaded.
@@ -849,7 +1016,7 @@ function local(event) {
 }
 
 function onCanvas(event) {
-  return !event.target.closest('.toolbar, .help, .notice');
+  return !event.target.closest('.toolbar, .help, .notice, .empty');
 }
 
 function wire() {
@@ -996,11 +1163,12 @@ function wire() {
         els.search.blur();
       }
     } else if (event.key === 'Enter') {
-      // The first design found, fitted.
+      // The first design found on the canvas, fitted; else the first in the list, its section shown.
       event.preventDefault();
-      const [first] = shown();
+      const [first = state.designs.find((d) => !d.li.hidden)] = shown();
       if (first) {
         state.autoFit = null;
+        if (first.section.hidden) setHidden((s) => s.hidden && s !== first.section, { reveal: false });
         select(first, { fit: true });
       }
     }
@@ -1078,6 +1246,7 @@ function wire() {
     const design = designFromHash();
     if (design && design !== state.selected) {
       state.autoFit = null;
+      if (design.section.hidden) setHidden((s) => s.hidden && s !== design.section, { reveal: false });
       if (!inFilter(design)) setCategory('', { fitAll: false });
       select(design, { fit: true });
     }
@@ -1090,6 +1259,11 @@ function wire() {
   $('reload').addEventListener('click', reloadAll);
   els.toggleList.addEventListener('click', () => toggleList());
   els.helpToggle.addEventListener('click', () => toggleHelp());
+  els.expandAll.addEventListener('click', () => setCollapsed(() => false));
+  els.collapseAll.addEventListener('click', () => setCollapsed(() => true));
+  els.showAll.addEventListener('click', () => setHidden(() => false));
+  els.hideAll.addEventListener('click', () => setHidden(() => true));
+  $('empty-show').addEventListener('click', () => setHidden(() => false));
   for (const id of ['zoom-in', 'zoom-out', 'zoom-reset', 'fit-all']) {
     $(id).addEventListener('click', () => {
       state.autoFit = null;
@@ -1126,6 +1300,7 @@ async function start() {
   const design = designFromHash();
   const saved = readStore('view');
   if (design) {
+    if (design.section.hidden) setHidden((s) => s.hidden && s !== design.section, { reveal: false });
     state.autoFit = design;
     select(design, { fit: true, animate: false });
   } else if (saved && [saved.x, saved.y, saved.z].every(Number.isFinite) && saved.z > 0) {
