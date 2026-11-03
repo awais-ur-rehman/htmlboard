@@ -1423,6 +1423,14 @@ function wire() {
     viewport.classList.remove('is-space');
   });
 
+  // A design calling scrollIntoView() or focus() scrolls every box around its frame. The canvas
+  // clips instead of scrolling (explorer.css); where clip isn't supported, it is put back.
+  viewport.addEventListener('scroll', () => {
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
+  });
+  window.addEventListener('scroll', () => window.scrollTo(0, 0));
+
   window.addEventListener('resize', () => {
     if (state.autoFit) fit(state.autoFit, { animate: false });
     else paint();

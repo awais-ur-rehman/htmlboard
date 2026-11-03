@@ -314,10 +314,14 @@ kbd {
 
 /* ---------- The canvas ---------- */
 
+/* clip, not just hidden: a hidden box can still be scrolled, and a design calling scrollIntoView()
+   or focus() scrolls every box around its frame, which would shift the canvas, its toolbar and
+   where the pointer lands. A clipped box can't scroll. */
 .viewport {
   position: relative;
   flex: 1;
   overflow: hidden;
+  overflow: clip;
   touch-action: none;
   background-color: var(--x-canvas);
   background-image: radial-gradient(circle at 1px 1px, var(--x-dot) 1px, transparent 0);
@@ -344,7 +348,7 @@ kbd {
 /* Designs the search leaves out stay in place, faded. */
 .frame.is-dimmed { opacity: 0.2; }
 
-.overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.overlay { position: absolute; inset: 0; overflow: hidden; overflow: clip; pointer-events: none; }
 
 .label, .section-title, .outline, .size { position: absolute; left: 0; top: 0; }
 
