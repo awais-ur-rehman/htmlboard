@@ -17,6 +17,8 @@ const MARGIN = 40;         // screen px around what a fit shows
 const NAME_SPACE = 24;     // screen px above a design for its name
 const MIN_NAMED = 56;      // screen px a design needs to be wide to show its name
 const TITLE_SPACE = 56;    // screen px above a section for its title and the names
+const TITLE_FONT = 20;     // screen px: a section's title, with room for it
+const TITLE_MIN = 13;      // screen px: the smallest it gets, zoomed far out
 const TOOLBAR_SPACE = 64;  // screen px kept clear at the bottom for the toolbar
 const DRAG_SLOP = 4;       // screen px a press can move and still be a click
 const DOUBLE_MS = 350;
@@ -506,7 +508,9 @@ function paint() {
   els.viewport.style.setProperty('--grid', `${grid}px`);
   els.viewport.style.backgroundPosition = `${x}px ${y}px`;
   // Above each row: the section's title, then the designs' names. Zoomed far out the gap between
-  // rows gets thin: the names give way first, then the title.
+  // rows gets thin: the names give way, and the title shrinks to fit it, down to TITLE_MIN px.
+  // Further out it keeps that size and goes over the top of its own designs: finding a section
+  // matters more then than seeing the top of its designs.
   let first = true;
   for (const section of state.sections) {
     if (!section.shown) {
@@ -518,8 +522,16 @@ function paint() {
     first = false;
     const named = room >= TITLE_SPACE + 2;
     const top = Math.round(y + section.y * z);
-    section.el.hidden = room < 30 || !section.name;
-    section.el.style.transform = `translate(${Math.round(x + section.x * z)}px, ${top - (named ? 54 : 30)}px)`;
+    section.el.hidden = !section.name;
+    const font = named ? TITLE_FONT : Math.round(clamp((room - 6) / 1.2, TITLE_MIN, TITLE_FONT) * 2) / 2;
+    const line = Math.round(font * 1.2);
+    const titleTop = named ? top - 54 : Math.max(top - line - 4, Math.round(top - room + 2));
+    if (section.font !== font) {
+      section.font = font;
+      Object.assign(section.el.style, { fontSize: `${font}px`, lineHeight: `${line}px` });
+    }
+    section.el.classList.toggle('is-over', titleTop + line > top);
+    section.el.style.transform = `translate(${Math.round(x + section.x * z)}px, ${titleTop}px)`;
     for (const design of section.designs) {
       if (!placed(design)) {
         design.label.hidden = true;
