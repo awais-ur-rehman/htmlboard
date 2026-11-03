@@ -5,6 +5,7 @@
 // pushes saved files at /api/events.
 
 import { checkDesigns } from './check.js';
+import { drawDesign } from './picture.js';
 
 const FRAME_GAP = 120;    // canvas px between the designs of a section
 const SECTION_GAP = 560;   // canvas px between sections
@@ -33,6 +34,7 @@ const els = {
   toast: $('toast'), notice: $('notice'), noticeTitle: $('notice-title'), noticeText: $('notice-text'),
   version: $('version'), sectionsBar: $('sections-bar'), expandAll: $('expand-all'), collapseAll: $('collapse-all'),
   showAll: $('show-all'), hideAll: $('hide-all'), empty: $('empty'), emptyText: $('empty-text'),
+  actions: $('actions'), copyImage: $('copy-image'), saveImage: $('save-image'),
 };
 
 const state = {
@@ -45,6 +47,7 @@ const state = {
   view: { x: 0, y: 0, z: 1 },
   selected: null,
   hover: null,
+  actions: null,        // the design whose buttons show (copy, save as an image)
   query: [],            // the search's words, folded
   category: '',         // the filter: a category, or '' for all
   // What the first view fitted ('all' or a design). Until the user moves the canvas, it is fitted
@@ -532,6 +535,40 @@ function paintMarks() {
     design.label.classList.toggle('is-selected', design === state.selected);
     design.label.classList.toggle('is-hover', design === state.hover);
   }
+  paintActions();
+}
+
+// The buttons of the design under the pointer (on a touch screen, of the selected one): above its
+// top right corner, in the row of its name, which makes way for them. When its top is off screen,
+// they go at the top of the screen, over the design, or below it.
+const noHover = matchMedia('(hover: none)');
+let actionsSize = null;
+function paintActions() {
+  const before = state.actions;
+  const design = state.hover || (noHover.matches ? state.selected : null);
+  state.actions = design;
+  els.actions.hidden = !design;
+  const { x, y, z } = state.view;
+  if (before && before !== design) before.label.style.width = `${Math.round(before.w * z)}px`;
+  if (!design) return;
+  actionsSize ||= { w: els.actions.offsetWidth, h: els.actions.offsetHeight };
+  const { w, h } = actionsSize;
+  const left = x + design.x * z;
+  const top = y + design.y * z;
+  const bottom = top + design.h * z;
+  const ax = clamp(left + design.w * z - w, 6, size().w - w - 6);
+  let ay = top - h - 4;
+  let below = false;
+  if (ay < 6) {
+    ay = Math.max(6, top + 6);
+    if (ay + h > bottom - 6) {
+      ay = bottom + 4;
+      below = true;
+    }
+  }
+  els.actions.classList.toggle('is-below', below);
+  els.actions.style.transform = `translate(${Math.round(ax)}px, ${Math.round(ay)}px)`;
+  design.label.style.width = `${Math.round(ay < top ? Math.max(0, ax - left - 8) : design.w * z)}px`;
 }
 
 function place(node, design) {
@@ -719,6 +756,143 @@ function hit(point) {
 
 function openSelected() {
   if (state.selected) window.open(urlOf(state.selected.file), '_blank', 'noopener');
+}
+
+// ---------------------------------------------------------------- a design as an image
+
+let exporting = false;
+
+const reason = (err) => String(err?.message || err || 'unknown error');
+
+// The design as a PNG of its full size, at the screen's pixel density (twice the size on a Retina screen).
+async function pngOf(design) {
+  const scale = clamp(Math.round(window.devicePixelRatio || 1), 1, 3);
+  const canvas = await drawDesign(design.iframe, { width: design.w, height: design.h, scale });
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('the image is too big');
+  return { blob, width: canvas.width, height: canvas.height };
+}
+
+function exportStarts(design) {
+  if (!design) toast('Select a design first');
+  if (!design || exporting || !design.frame.isConnected) return false;
+  exporting = true;
+  els.actions.setAttribute('aria-busy', 'true');
+  return true;
+}
+
+function exportEnds() {
+  exporting = false;
+  els.actions.removeAttribute('aria-busy');
+}
+
+async function copyImage(design) {
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    toast('This browser can’t copy images: save it instead (S)');
+    return;
+  }
+  if (!exportStarts(design)) return;
+  toast(`Copying ${design.title}…`);
+  const png = pngOf(design);
+  png.catch(() => {}); // told below
+  try {
+    // Written right away, while the click still allows it; the image follows when it's drawn
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png.then((p) => p.blob) })]);
+    const { width, height } = await png;
+    toast(`Copied ${design.title} (${width} × ${height})`);
+  } catch (err) {
+    toast(`Couldn’t copy ${design.title}: ${reason(await png.then(() => err, (drawing) => drawing))}`);
+  } finally {
+    exportEnds();
+  }
+}
+
+// Saved in a folder chosen once per project; without folder access (Firefox, Safari), downloaded.
+async function saveImage(design, { choose = false } = {}) {
+  if (!exportStarts(design)) return;
+  const name = `${design.id.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-')}.png`;
+  try {
+    if (!window.showDirectoryPicker) {
+      download((await pngOf(design)).blob, name);
+      toast(`Downloaded ${name}`);
+      return;
+    }
+    const folder = await saveFolder(choose); // asked for first, while the click still allows it
+    if (!folder) return;
+    toast(`Saving ${design.title}…`);
+    const { blob } = await pngOf(design);
+    const file = await freeName(folder, name);
+    const writable = await (await folder.getFileHandle(file, { create: true })).createWritable();
+    await writable.write(blob);
+    await writable.close();
+    toast(`Saved ${file} in ${folder.name || 'the folder'}`);
+  } catch (err) {
+    if (err?.name === 'NotFoundError') toast(`Couldn’t save ${design.title}: its folder is gone (Shift + click Save to choose another)`);
+    else if (err?.name !== 'AbortError') toast(`Couldn’t save ${design.title}: ${reason(err)}`); // not a cancelled picker
+  } finally {
+    exportEnds();
+  }
+}
+
+// The folder images go to: chosen the first time (or with Shift) and remembered for the project. On
+// a later visit the browser asks again for leave to write in it, unless it was given for good.
+async function saveFolder(choose) {
+  const key = `${storePrefix}save-folder`;
+  const saved = choose ? null : await folders('readonly', (store) => store.get(key)).catch(() => null);
+  if (saved) {
+    const mode = { mode: 'readwrite' };
+    if (await saved.queryPermission(mode) === 'granted' || await saved.requestPermission(mode) === 'granted') return saved;
+    toast(`Not allowed to save in ${saved.name}: Shift + click Save to choose another folder`);
+    return null;
+  }
+  const folder = await window.showDirectoryPicker({ id: 'htmlboard-images', mode: 'readwrite' });
+  await folders('readwrite', (store) => store.put(folder, key)).catch(() => {});
+  return folder;
+}
+
+// Kept in IndexedDB: a folder the browser gave access to can't go in localStorage.
+function folders(mode, request) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open('htmlboard', 1);
+    open.onupgradeneeded = () => open.result.createObjectStore('folders');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('folders', mode);
+      const asked = request(tx.objectStore('folders'));
+      tx.oncomplete = () => {
+        db.close();
+        resolve(asked.result);
+      };
+      tx.onerror = tx.onabort = () => {
+        db.close();
+        reject(tx.error);
+      };
+    };
+  });
+}
+
+// name.png, or name-2.png, name-3.png… when that is taken: saving never replaces an image.
+async function freeName(folder, name) {
+  const stem = name.replace(/\.png$/, '');
+  for (let n = 1; n < 1000; n++) {
+    const file = n === 1 ? name : `${stem}-${n}.png`;
+    try {
+      await folder.getFileHandle(file);
+    } catch (err) {
+      if (err.name === 'NotFoundError') return file;
+      if (err.name !== 'TypeMismatchError') throw err; // a folder of that name: the next one
+    }
+  }
+  throw new Error(`${name} and 999 more are taken`);
+}
+
+function download(blob, name) {
+  const link = el('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 10000);
 }
 
 // ---------------------------------------------------------------- panels and messages
@@ -1024,14 +1198,14 @@ function local(event) {
 }
 
 function onCanvas(event) {
-  return !event.target.closest('.toolbar, .help, .notice, .empty');
+  return !event.target.closest('.toolbar, .help, .notice, .empty, .actions');
 }
 
 function wire() {
   const { viewport } = els;
 
   viewport.addEventListener('wheel', (event) => {
-    if (!onCanvas(event)) return;
+    if (event.target.closest('.toolbar, .help, .notice')) return; // over a design's buttons, it still moves
     event.preventDefault();
     state.autoFit = null;
     cancelAnimationFrame(animation);
@@ -1055,6 +1229,8 @@ function wire() {
       }
       setView({ ...state.view, x: state.view.x - dx, y: state.view.y - dy });
     }
+    // The canvas moved under the pointer: the design under it now
+    if (!pointers.size) setHover(hit(local(event)));
   }, { passive: false });
 
   // Ctrl + scroll and pinches anywhere else (the list, the toolbar) would zoom the whole page.
@@ -1213,6 +1389,8 @@ function wire() {
         search('');
       } else if (state.category) setCategory('');
     } else if (key === 'Enter' && !onControl) openSelected();
+    else if (key === 'c' || key === 'C') copyImage(state.selected || state.hover);
+    else if (key === 's' || key === 'S') saveImage(state.selected || state.hover, { choose: event.shiftKey });
     else if (key === 'r' || key === 'R') reloadAll();
     else if (key === '/') {
       if (els.app.classList.contains('is-collapsed')) toggleList(true);
@@ -1272,6 +1450,9 @@ function wire() {
   els.showAll.addEventListener('click', () => setHidden(() => false));
   els.hideAll.addEventListener('click', () => setHidden(() => true));
   $('empty-show').addEventListener('click', () => setHidden(() => false));
+  els.copyImage.addEventListener('click', () => copyImage(state.actions));
+  els.saveImage.addEventListener('click', (event) => saveImage(state.actions, { choose: event.shiftKey }));
+  if (!window.showDirectoryPicker) els.saveImage.title = 'Download as an image (S)';
   for (const id of ['zoom-in', 'zoom-out', 'zoom-reset', 'fit-all']) {
     $(id).addEventListener('click', () => {
       state.autoFit = null;

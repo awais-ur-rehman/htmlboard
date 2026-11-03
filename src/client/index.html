@@ -60,6 +60,14 @@
         <div class="outline outline--selected" id="selection" hidden></div>
         <div class="size" id="size" hidden></div>
       </div>
+      <div class="actions" id="actions" role="toolbar" aria-label="Design" hidden>
+        <button class="mini" type="button" id="copy-image" title="Copy as an image (C)" aria-label="Copy as an image">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        </button>
+        <button class="mini" type="button" id="save-image" title="Save as an image (S); Shift + click: choose the folder" aria-label="Save as an image">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        </button>
+      </div>
 
       <div class="toolbar" role="toolbar" aria-label="Canvas">
         <button class="tool" type="button" id="toggle-list" title="Show or hide the list (\)" aria-label="Show or hide the list" aria-pressed="true">
@@ -102,6 +110,7 @@
           <div><dt><kbd>Shift</kbd> + <kbd>2</kbd>, double-click</dt><dd>Fit the design</dd></div>
           <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Previous, next design</dd></div>
           <div><dt><kbd>Enter</kbd></dt><dd>Open the design on its own</dd></div>
+          <div><dt><kbd>C</kbd> <kbd>S</kbd></dt><dd>Copy, save the design as an image</dd></div>
           <div><dt><kbd>/</kbd></dt><dd>Search</dd></div>
           <div><dt><kbd>1</kbd> – <kbd>4</kbd></dt><dd>All, mobile, tablet, desktop</dd></div>
           <div><dt><kbd>R</kbd></dt><dd>Reload the designs</dd></div>
