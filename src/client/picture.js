@@ -83,6 +83,7 @@ function reader(win) {
     // Can't tell
   }
   const read = new Map();
+  const svgs = new Map();
   return {
     used,
     // '' when it can't be read: missing, or another site's that doesn't allow it
@@ -94,6 +95,19 @@ function reader(win) {
           .catch(() => ''));
       }
       return read.get(url);
+    },
+    // An SVG file, parsed (a sprite of icons that <use> draws from); null when it can't be read
+    svg(url) {
+      if (!svgs.has(url)) {
+        svgs.set(url, fetch(url)
+          .then((res) => (res.ok ? res.text() : ''))
+          .then((text) => {
+            const parsed = text && new DOMParser().parseFromString(text, 'image/svg+xml');
+            return parsed && !parsed.querySelector('parsererror') ? parsed : null;
+          })
+          .catch(() => null));
+      }
+      return svgs.get(url);
     },
   };
 }
@@ -192,6 +206,29 @@ async function copyPage(doc, files) {
   const live = [root, ...root.querySelectorAll('*')];
   const copies = [copy, ...copy.querySelectorAll('*')]; // the same elements, in the same order
   const waits = [];
+  const symbols = new Map(); // another file's symbol that <use> draws (`file#id`) → its id in the copy
+  let sprite = null; // where the copy keeps them
+  let count = 0;
+  const symbolFrom = async (file, id) => {
+    const key = `${file}#${id}`;
+    if (!symbols.has(key)) {
+      symbols.set(key, files.svg(file).then((svg) => {
+        const symbol = svg?.getElementById(id);
+        if (!symbol) return '';
+        if (!sprite) {
+          sprite = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          sprite.setAttribute('aria-hidden', 'true');
+          sprite.setAttribute('style', 'position: absolute; width: 0; height: 0; overflow: hidden');
+          (copy.querySelector('body') || copy).append(sprite);
+        }
+        const inlined = doc.importNode(symbol, true);
+        inlined.id = `htmlboard-symbol-${++count}`;
+        sprite.append(inlined);
+        return inlined.id;
+      }));
+    }
+    return symbols.get(key);
+  };
   live.forEach((el, i) => {
     const out = copies[i];
     const tag = el.localName;
@@ -209,6 +246,18 @@ async function copyPage(doc, files) {
         waits.push(files.dataUrl(full).then((data) => {
           out.removeAttribute('xlink:href');
           out.setAttribute('href', data || TRANSPARENT);
+        }));
+      }
+    } else if (tag === 'use') {
+      // A symbol from another file (a sprite of icons), which an image can't load: brought in
+      const href = el.getAttribute('href') ?? el.getAttribute('xlink:href') ?? '';
+      const hash = href.indexOf('#');
+      const file = hash > 0 ? absolute(href.slice(0, hash), doc.baseURI) : null;
+      if (file && hash < href.length - 1) {
+        waits.push(symbolFrom(file, href.slice(hash + 1)).then((id) => {
+          if (!id) return;
+          out.removeAttribute('xlink:href');
+          out.setAttribute('href', `#${id}`);
         }));
       }
     } else if (tag === 'canvas') {
