@@ -8,6 +8,7 @@
 
 const MAX_SIDE = 16384; // px: the longest side browsers draw a canvas at
 const MAX_AREA = 64e6; // px: about 256 MB of pixels
+const FULL_AREA = 16e6; // px: the most a page is drawn at its size before it's shrunk (see drawDesign)
 const LOAD_MS = 10000;
 const TRANSPARENT = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const URL_RE = /url\(\s*(['"]?)(.*?)\1\s*\)/gi;
@@ -50,17 +51,60 @@ export async function drawDesign(iframe, { width, height, scale = 1 }) {
   } catch {
     throw new Error('the browser couldn’t draw this page');
   }
-  scale = Math.min(scale, MAX_SIDE / width, MAX_SIDE / height, Math.sqrt(MAX_AREA / (width * height)));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(width * scale));
-  canvas.height = Math.max(1, Math.round(height * scale));
+  const most = Math.min(MAX_SIDE / width, MAX_SIDE / height, Math.sqrt(MAX_AREA / (width * height)));
+  scale = Math.min(scale, most);
+  const canvas = sized(width * scale, height * scale);
   const context = canvas.getContext('2d');
   // The page's background fills the frame in a browser; in an image it would cover only its box.
   context.fillStyle = backdrop(doc, win);
   context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  // Drawn smaller than its size, Firefox lays the page out in a window that small, so its media
+  // queries and vw/vh units would make another page (a desktop design in its phone layout): there
+  // it's drawn at its size first, then shrunk.
+  const full = Math.min(1, most, Math.sqrt(FULL_AREA / (width * height)));
+  if (scale < full && await shrinksImages()) {
+    let page = sized(width * full, height * full);
+    page.getContext('2d').drawImage(image, 0, 0, page.width, page.height);
+    // Halved until it's at most twice the size: shrunk at once, most of its pixels would be skipped
+    while (page.width > canvas.width * 2 || page.height > canvas.height * 2) {
+      const half = sized(page.width / 2, page.height / 2);
+      half.getContext('2d').drawImage(page, 0, 0, half.width, half.height);
+      page.width = 0; // its pixels can go
+      page = half;
+    }
+    context.drawImage(page, 0, 0, canvas.width, canvas.height);
+    page.width = 0;
+  } else {
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  }
   image.src = ''; // the copy of the page it holds can go now, not when memory runs short
   return canvas;
+}
+
+function sized(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width));
+  canvas.height = Math.max(1, Math.round(height));
+  return canvas;
+}
+
+// Whether the browser lays out an image drawn smaller than its size in a window of the smaller size
+// (Firefox), told once: a box 100vw × 100vh fills an image 40 px wide, drawn at 10.
+let shrinking = null;
+function shrinksImages() {
+  shrinking ||= (async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><foreignObject width="40" height="40">'
+      + '<div xmlns="http://www.w3.org/1999/xhtml" style="width: 100vw; height: 100vh; background: #000"></div>'
+      + '</foreignObject></svg>';
+    const image = new Image();
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    await image.decode();
+    const canvas = sized(10, 10);
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0, 10, 10);
+    return context.getImageData(9, 9, 1, 1).data[3] < 128; // laid out 10 px wide, the box is 2.5 px
+  })().catch(() => false);
+  return shrinking;
 }
 
 /** The frame's page once it has loaded (a frame reloading after a save is waited for) */
