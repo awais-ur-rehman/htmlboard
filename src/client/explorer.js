@@ -261,10 +261,14 @@ function onLoad(design) {
   }).observe(doc.documentElement, { childList: true, subtree: true, characterData: true, attributes: true });
 }
 
-// A design without a height takes its page's.
+// A design without a height takes its page's, measured while the page is laid out at its frame's
+// width: in a smaller window (a browser that shrinks the pages it doesn't draw, see
+// shrinksPagesUndrawn) it would come out far too tall, and its frame couldn't shrink back. Such a
+// page is measured once it's drawn again.
 function growToPage(design) {
   const doc = design.iframe.contentDocument;
-  if (!doc?.documentElement) return;
+  // Its window's width, from the page: the frame's (innerWidth) would lay out the canvas too (Chrome)
+  if (!doc?.documentElement || doc.documentElement.clientWidth !== design.w) return;
   const h = Math.ceil(Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0));
   if (!h || h === design.h) return;
   design.h = h;
@@ -503,7 +507,7 @@ function layout() {
     let x = 0;
     let height = 0;
     for (const design of section.designs) {
-      design.frame.hidden = !inFilter(design);
+      design.frame.classList.toggle('is-out', !inFilter(design));
       if (!placed(design)) continue;
       design.x = x;
       design.y = y;
@@ -517,6 +521,23 @@ function layout() {
   }
   if (state.autoFit) fit(state.autoFit, { animate: false });
   else paint();
+}
+
+// Whether the browser gives a page it doesn't draw (content-visibility: hidden) a window of almost
+// nothing, as Firefox does (10 × 10): the page would lay itself out again at that size, its scripts
+// would see it, and it would be measured far too tall. There, designs not drawn are only hidden.
+function shrinksPagesUndrawn() {
+  const box = el('div');
+  box.style.cssText = 'position: absolute; left: -9999px; top: 0; width: 100px; height: 80px';
+  const frame = el('iframe');
+  frame.style.cssText = 'display: block; width: 100%; height: 100%; border: 0';
+  box.append(frame);
+  document.body.append(box);
+  const shown = frame.contentWindow.innerWidth;
+  box.style.contentVisibility = 'hidden';
+  const shrinks = frame.contentWindow.innerWidth !== shown;
+  box.remove();
+  return shrinks;
 }
 
 function paint() {
@@ -989,7 +1010,8 @@ function paintFrame(design) {
     design.drawnSince = 0;
   } else if (!design.drawnSince) {
     design.drawnSince = performance.now();
-    // Measured again on its way back: a page measured while it isn't drawn can come out a few px off
+    // Measured on its way back: while it wasn't drawn, its page may have gone unmeasured (see
+    // growToPage), or come out a few px off
     if (design.loadedAt && design.autoHeight) requestAnimationFrame(() => growToPage(design));
   }
 }
@@ -1177,6 +1199,7 @@ function sameShape(manifest) {
 // Names, sizes, categories and descriptions changed in place: no frame reloads.
 function patch(manifest) {
   const boards = manifest.sections.flatMap((section) => section.artboards.map((board) => [board, section]));
+  const remeasure = []; // lost their height, or changed width: measured once their frames have their new size
   boards.forEach(([board, section], i) => {
     const design = state.designs[i];
     design.title = board.title || design.file;
@@ -1189,9 +1212,10 @@ function patch(manifest) {
     design.search = fold([design.title, design.file, board.description, board.category, ...(board.tags || []), section.name]
       .filter(Boolean).join(' '));
     const autoHeight = !Number(board.height);
-    if (Number(board.width)) design.w = Number(board.width);
+    const width = Number(board.width) || design.w;
+    if (autoHeight && (!design.autoHeight || width !== design.w)) remeasure.push(design);
+    design.w = width;
     if (!autoHeight) design.h = Number(board.height);
-    else if (!design.autoHeight) growToPage(design);
     design.autoHeight = autoHeight;
     showDims(design);
   });
@@ -1199,6 +1223,7 @@ function patch(manifest) {
   buildFilters();
   applySearch();
   layout();
+  remeasure.forEach(growToPage);
 }
 
 // Reads the designs again: 'rebuilt' (a new canvas), 'patched' (names or sizes) or false (no change).
@@ -1675,6 +1700,7 @@ async function start() {
     els.toggleList.setAttribute('aria-pressed', 'false');
   }
   els.viewport.tabIndex = -1;
+  els.world.classList.toggle('is-hiding', shrinksPagesUndrawn());
   build(manifest);
   wire();
 

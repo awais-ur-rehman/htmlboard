@@ -348,6 +348,11 @@ kbd {
 /* Designs the search leaves out stay in place, faded. */
 .frame.is-dimmed { opacity: 0.2; }
 
+/* Left out by the filter: not drawn, and the others take its place (layout in explorer.js). Not
+   display: none, which would take its page's window away: a page reloading then would build itself
+   for a window of nothing. */
+.frame.is-out { visibility: hidden; content-visibility: hidden; }
+
 /* Well off screen: not drawn (see paint in explorer.js) */
 .frame.is-away { content-visibility: hidden; }
 
@@ -357,6 +362,10 @@ kbd {
 .frame.is-still .page { content-visibility: hidden; }
 .picture { position: absolute; inset: 0; display: none; width: 100%; height: 100%; pointer-events: none; user-select: none; }
 .frame.is-picture .picture { display: block; }
+
+/* A browser that gives a page it doesn't draw that way a window of almost nothing (Firefox: 10 × 10)
+   only hides it instead, so the page keeps its size (see shrinksPagesUndrawn in explorer.js) */
+.world.is-hiding :is(.frame.is-away, .frame.is-out, .frame.is-still .page) { content-visibility: visible; visibility: hidden; }
 
 .overlay { position: absolute; inset: 0; overflow: hidden; overflow: clip; pointer-events: none; }
 
